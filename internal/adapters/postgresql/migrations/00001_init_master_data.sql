@@ -37,9 +37,10 @@ CREATE TABLE products (
     barcode VARCHAR(100), -- could be empty for jasa
     name VARCHAR(200) NOT NULL,
     type VARCHAR(20) CHECK (type IN ('barang', 'jasa')) DEFAULT 'barang',
-    base_unit VARCHAR(50) NOT NULL,    -- 'pcs', 'lembar', 'buku'
+    base_unit VARCHAR(50) NOT NULL,    -- 'pcs', 'lembar', 'buah'
     is_open_price BOOLEAN DEFAULT false, 
-    current_stock INT DEFAULT 0,       -- cache stock
+    current_stock INT DEFAULT 0,       -- cache stock so its not too berat
+    average_cost NUMERIC(15, 2) NOT NULL DEFAULT 0,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

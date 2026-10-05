@@ -9,10 +9,11 @@ import (
 )
 
 type Querier interface {
-	CreateItem(ctx context.Context, arg CreateItemParams) (Item, error)
-	FindItemByID(ctx context.Context, id int32) (Item, error)
+	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
+	DeleteCategory(ctx context.Context, id int32) error
+	GetCategoryByID(ctx context.Context, id int32) (Category, error)
 	ListCategories(ctx context.Context) ([]Category, error)
-	ListItems(ctx context.Context) ([]Item, error)
+	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) error
 }
 
 var _ Querier = (*Queries)(nil)

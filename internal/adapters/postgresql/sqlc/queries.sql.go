@@ -7,105 +7,69 @@ package repo
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createItem = `-- name: CreateItem :one
-INSERT INTO items (
-    category_id,
-    sku,
-    barcode,
-    name,
-    type,
-    unit,
-    price,
-    stock,
-    min_stock,
-    is_active
+const createCategory = `-- name: CreateCategory :one
+INSERT INTO categories (
+	code, name
 ) VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7,
-    $8,
-    $9,
-    $10
-)
-RETURNING id, category_id, sku, barcode, name, type, unit, price, stock, min_stock, is_active
+	$1, $2
+) RETURNING id, code, name, is_active, created_at, updated_at
 `
 
-type CreateItemParams struct {
-	CategoryID pgtype.Int4    `json:"category_id"`
-	Sku        pgtype.Text    `json:"sku"`
-	Barcode    pgtype.Text    `json:"barcode"`
-	Name       string         `json:"name"`
-	Type       pgtype.Text    `json:"type"`
-	Unit       pgtype.Text    `json:"unit"`
-	Price      pgtype.Numeric `json:"price"`
-	Stock      int32          `json:"stock"`
-	MinStock   pgtype.Int4    `json:"min_stock"`
-	IsActive   bool           `json:"is_active"`
+type CreateCategoryParams struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
 }
 
-func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) (Item, error) {
-	row := q.db.QueryRow(ctx, createItem,
-		arg.CategoryID,
-		arg.Sku,
-		arg.Barcode,
-		arg.Name,
-		arg.Type,
-		arg.Unit,
-		arg.Price,
-		arg.Stock,
-		arg.MinStock,
-		arg.IsActive,
-	)
-	var i Item
+func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error) {
+	row := q.db.QueryRow(ctx, createCategory, arg.Code, arg.Name)
+	var i Category
 	err := row.Scan(
 		&i.ID,
-		&i.CategoryID,
-		&i.Sku,
-		&i.Barcode,
+		&i.Code,
 		&i.Name,
-		&i.Type,
-		&i.Unit,
-		&i.Price,
-		&i.Stock,
-		&i.MinStock,
 		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const findItemByID = `-- name: FindItemByID :one
-SELECT id, category_id, sku, barcode, name, type, unit, price, stock, min_stock, is_active from items WHERE id = $1
+const deleteCategory = `-- name: DeleteCategory :exec
+UPDATE categories
+SET is_active = false, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
 `
 
-func (q *Queries) FindItemByID(ctx context.Context, id int32) (Item, error) {
-	row := q.db.QueryRow(ctx, findItemByID, id)
-	var i Item
+func (q *Queries) DeleteCategory(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, deleteCategory, id)
+	return err
+}
+
+const getCategoryByID = `-- name: GetCategoryByID :one
+SELECT id, code, name, is_active, created_at, updated_at FROM categories
+WHERE id = $1 LIMIT 1
+`
+
+func (q *Queries) GetCategoryByID(ctx context.Context, id int32) (Category, error) {
+	row := q.db.QueryRow(ctx, getCategoryByID, id)
+	var i Category
 	err := row.Scan(
 		&i.ID,
-		&i.CategoryID,
-		&i.Sku,
-		&i.Barcode,
+		&i.Code,
 		&i.Name,
-		&i.Type,
-		&i.Unit,
-		&i.Price,
-		&i.Stock,
-		&i.MinStock,
 		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const listCategories = `-- name: ListCategories :many
-SELECT id, name, type from categories
+SELECT id, code, name, is_active, created_at, updated_at FROM categories
+WHERE is_active = true
+ORDER BY name ASC
 `
 
 func (q *Queries) ListCategories(ctx context.Context) ([]Category, error) {
@@ -117,7 +81,14 @@ func (q *Queries) ListCategories(ctx context.Context) ([]Category, error) {
 	var items []Category
 	for rows.Next() {
 		var i Category
-		if err := rows.Scan(&i.ID, &i.Name, &i.Type); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.Name,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -128,38 +99,19 @@ func (q *Queries) ListCategories(ctx context.Context) ([]Category, error) {
 	return items, nil
 }
 
-const listItems = `-- name: ListItems :many
-SELECT id, category_id, sku, barcode, name, type, unit, price, stock, min_stock, is_active from items
+const updateCategory = `-- name: UpdateCategory :exec
+UPDATE categories
+SET code = $2, name = $3, updated_at = CURRENT_TIMESTAMP
+WHERE id  = $1
 `
 
-func (q *Queries) ListItems(ctx context.Context) ([]Item, error) {
-	rows, err := q.db.Query(ctx, listItems)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Item
-	for rows.Next() {
-		var i Item
-		if err := rows.Scan(
-			&i.ID,
-			&i.CategoryID,
-			&i.Sku,
-			&i.Barcode,
-			&i.Name,
-			&i.Type,
-			&i.Unit,
-			&i.Price,
-			&i.Stock,
-			&i.MinStock,
-			&i.IsActive,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+type UpdateCategoryParams struct {
+	ID   int32  `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) error {
+	_, err := q.db.Exec(ctx, updateCategory, arg.ID, arg.Code, arg.Name)
+	return err
 }

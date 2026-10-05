@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	repo "github.com/ELghazX/pos-toko-ubaidillah/internal/adapters/postgresql/sqlc"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/categories"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -32,20 +34,20 @@ func (app *application) run(h http.Handler) error {
 func (app *application) mount() http.Handler {
 	r := chi.NewRouter()
 
-	// A good base middleware stack
 	r.Use(middleware.RequestID)
-	r.Use(middleware.ClientIPFromRemoteAddr) // pick one ClientIPFrom* based on your infra, see below
+	r.Use(middleware.ClientIPFromRemoteAddr)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	// Set a timeout value on the request context (ctx), that will signal
-	// through ctx.Done() that the request has timed out and further
-	// processing should be stopped.
 	r.Use(middleware.Timeout(30 * time.Second))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Healthy"))
 	})
+
+	categoriesHandler := categories.NewHandler(categories.NewService(repo.New(app.db)))
+	r.Get("/categories", categoriesHandler.ListCategories)
+	r.Delete("/categories/{id}", categoriesHandler.DeleteCategory)
 
 	return r
 

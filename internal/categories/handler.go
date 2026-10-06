@@ -48,3 +48,52 @@ func (h *handler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 }
+
+func (h *handler) CreateCategory(w http.ResponseWriter, r *http.Request) {
+	code := r.FormValue("code")
+	name := r.FormValue("name")
+
+	_, err := h.service.CreateCategory(r.Context(), code, name)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+
+	}
+	categories, err := h.service.ListCategories(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	component := CategoryTable(categories)
+	component.Render(r.Context(), w)
+
+}
+
+func (h *handler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "ID tidak valid", http.StatusBadRequest)
+		return
+	}
+	code := r.FormValue("code")
+	name := r.FormValue("name")
+
+	if err := h.service.UpdateCategory(r.Context(), int32(id), code, name); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	categories, err := h.service.ListCategories(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	component := CategoryTable(categories)
+	component.Render(r.Context(), w)
+
+}

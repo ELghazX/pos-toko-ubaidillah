@@ -48,6 +48,8 @@ func (app *application) mount() http.Handler {
 	categoriesHandler := categories.NewHandler(categories.NewService(repo.New(app.db)))
 	r.Get("/categories", categoriesHandler.ListCategories)
 	r.Delete("/categories/{id}", categoriesHandler.DeleteCategory)
+	r.Post("/categories", categoriesHandler.CreateCategory)
+	r.Put("/categories/{id}", categoriesHandler.UpdateCategory)
 
 	return r
 

@@ -38,7 +38,9 @@ type Querier interface {
 	DeleteProduct(ctx context.Context, id int32) error
 	DeletePurchaseDetailByID(ctx context.Context, id int32) error
 	DeleteSupplier(ctx context.Context, id int32) error
+	GetCategoryByCode(ctx context.Context, dollar_1 string) (Category, error)
 	GetCategoryByID(ctx context.Context, id int32) (Category, error)
+	GetCategoryByName(ctx context.Context, dollar_1 string) (Category, error)
 	GetCompanyConfig(ctx context.Context) (GetCompanyConfigRow, error)
 	GetCustomerByID(ctx context.Context, id int32) (Customer, error)
 	GetCustomerByIDAnyStatus(ctx context.Context, id int32) (Customer, error)

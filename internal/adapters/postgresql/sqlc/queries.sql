@@ -7,6 +7,14 @@ ORDER BY name ASC;
 SELECT * FROM categories
 WHERE id = $1 LIMIT 1;
 
+-- name: GetCategoryByCode :one
+SELECT * FROM categories
+WHERE UPPER(code) = UPPER($1::text) LIMIT 1;
+
+-- name: GetCategoryByName :one
+SELECT * FROM categories
+WHERE LOWER(name) = LOWER($1::text) AND is_active = true LIMIT 1;
+
 
 -- name: CreateCategory :one
 INSERT INTO categories (

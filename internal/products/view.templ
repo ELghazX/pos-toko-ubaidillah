@@ -179,45 +179,48 @@ templ ProductPage(data ProductPageData) {
 		>
 			<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
 				<div>
-					<h1 class="text-3xl font-bold text-[#1D1D1F] tracking-tight">Daftar Produk &amp; Jasa</h1>
-					<p class="text-sm text-[#8E8E93] mt-1">Kelola data produk, barcode, multi-satuan, dan stok gudang</p>
+					<h1 class="text-2xl sm:text-3xl font-bold text-[#1D1D1F] tracking-tight">Daftar Produk &amp; Jasa</h1>
+					<p class="text-xs sm:text-sm text-[#8E8E93] mt-1">Kelola data produk, barcode, multi-satuan, dan stok gudang</p>
 				</div>
-				<div class="flex shrink-0 items-center gap-2.5">
+				<div class="grid grid-cols-2 sm:flex sm:flex-wrap sm:shrink-0 items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+					<a
+						href="/products/new"
+						class="col-span-2 sm:col-span-1 order-first sm:order-last bg-[#007AFF] text-white px-4 min-h-[44px] inline-flex items-center justify-center rounded-xl font-medium hover:bg-[#0066D6] transition shadow-xs w-full sm:w-auto"
+					>
+						+ Tambah Produk
+					</a>
 					<a
 						href="/stock-adjustments"
-						class="bg-white border border-[#E5E5EA] text-[#1D1D1F] px-4 min-h-[44px] inline-flex items-center gap-2 rounded-xl text-sm font-medium hover:bg-[#F5F5F7] transition shadow-xs"
+						class="bg-white border border-[#E5E5EA] text-[#1D1D1F] px-3 sm:px-4 min-h-[44px] inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-[#F5F5F7] transition shadow-xs text-center"
 						title="Stok Opname &amp; Pemakaian Barang"
 					>
-						<svg class="w-4 h-4 text-[#007AFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-						<span>Stok Opname &amp; Pakai</span>
+						<svg class="w-4 h-4 text-[#007AFF] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+						<span class="truncate">Opname &amp; Pakai</span>
 					</a>
 					<a
 						href="/products/print-labels"
-						class="bg-white border border-[#E5E5EA] text-[#1D1D1F] px-4 min-h-[44px] inline-flex items-center gap-2 rounded-xl text-sm font-medium hover:bg-[#F5F5F7] transition shadow-xs"
+						class="bg-white border border-[#E5E5EA] text-[#1D1D1F] px-3 sm:px-4 min-h-[44px] inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-[#F5F5F7] transition shadow-xs text-center"
 						title="Cetak Label Harga &amp; Barcode Rak Massal"
 					>
-						<svg class="w-4 h-4 text-[#007AFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
-						<span>Cetak Label Rak</span>
+						<svg class="w-4 h-4 text-[#007AFF] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+						<span class="truncate">Cetak Label</span>
 					</a>
 					<button
 						id="btn-sync-stock"
 						type="button"
 						@click="startStream()"
 						:disabled="syncing"
-						class="bg-white border border-[#E5E5EA] text-[#1D1D1F] px-4 min-h-[44px] inline-flex items-center gap-2 rounded-xl text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-60 disabled:cursor-not-allowed transition shadow-xs"
+						class="col-span-2 sm:col-span-1 bg-white border border-[#E5E5EA] text-[#1D1D1F] px-3 sm:px-4 min-h-[44px] inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-60 disabled:cursor-not-allowed transition shadow-xs text-center"
 						title="Hitung ulang stok dari inventory ledger"
 					>
 						<template x-if="!syncing">
-							<svg class="w-4 h-4 text-[#007AFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+							<svg class="w-4 h-4 text-[#007AFF] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"></path></svg>
 						</template>
 						<template x-if="syncing">
-							<svg class="w-4 h-4 text-[#007AFF] animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+							<svg class="w-4 h-4 text-[#007AFF] animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
 						</template>
-						<span x-text="syncing ? 'Menyinkronkan...' : 'Update Stok Ledger'">Update Stok Ledger</span>
+						<span x-text="syncing ? 'Menyinkronkan...' : 'Update Stok Ledger'" class="truncate">Update Stok Ledger</span>
 					</button>
-					<a href="/products/new" class="bg-[#007AFF] text-white px-5 min-h-[44px] inline-flex items-center rounded-xl font-medium hover:bg-[#0066D6] transition shadow-xs">
-						+ Tambah Produk
-					</a>
 				</div>
 			</div>
 			<div
@@ -266,7 +269,7 @@ templ ProductPage(data ProductPageData) {
 				<div class="mb-5 p-4 bg-[#FF9500]/10 border border-[#FF9500]/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
 					<div class="flex items-center gap-3 text-[#B26A00]">
 						<div class="w-8 h-8 rounded-full bg-[#FF9500]/20 flex items-center justify-center flex-shrink-0 text-[#FF9500]">
-							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"></path></svg>
 						</div>
 						<div>
 							<p class="font-bold text-[#1D1D1F]">Peringatan Stok Menipis</p>
@@ -275,7 +278,7 @@ templ ProductPage(data ProductPageData) {
 					</div>
 					<a
 						href="/products?stock_filter=low_stock"
-						class="px-4 min-h-[44px] inline-flex items-center justify-center bg-[#FF9500] hover:bg-[#E08500] text-white font-semibold rounded-xl text-xs transition text-center whitespace-nowrap shadow-xs"
+						class="px-4 min-h-[44px] inline-flex items-center justify-center bg-[#FF9500] hover:bg-[#E08500] text-white font-semibold rounded-xl text-xs transition text-center whitespace-nowrap shadow-xs w-full sm:w-auto"
 					>
 						Lihat Produk Menipis &rarr;
 					</a>
@@ -295,12 +298,12 @@ templ ProductPage(data ProductPageData) {
 						hx-trigger="keyup changed delay:400ms, search"
 						hx-include="[name='category_id'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']"
 					/>
-					<svg class="w-5 h-5 text-[#8E8E93] absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+					<svg class="w-5 h-5 text-[#8E8E93] absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path></svg>
 				</div>
-				<div class="flex flex-wrap justify-end gap-2.5 text-sm">
+				<div class="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-end gap-2 sm:gap-2.5 text-sm w-full lg:w-auto">
 					<select
 						name="category_id"
-						class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						class="w-full sm:w-auto border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
 						hx-get="/products"
 						hx-target="#product-table-container"
 						hx-swap="outerHTML"
@@ -313,7 +316,7 @@ templ ProductPage(data ProductPageData) {
 					</select>
 					<select
 						name="type"
-						class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						class="w-full sm:w-auto border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
 						hx-get="/products"
 						hx-target="#product-table-container"
 						hx-swap="outerHTML"
@@ -325,7 +328,7 @@ templ ProductPage(data ProductPageData) {
 					</select>
 					<select
 						name="stock_filter"
-						class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						class="col-span-2 sm:col-span-1 w-full sm:w-auto border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
 						hx-get="/products"
 						hx-target="#product-table-container"
 						hx-swap="outerHTML"
@@ -344,7 +347,7 @@ templ ProductPage(data ProductPageData) {
 					</select>
 					<select
 						name="sort"
-						class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						class="w-full sm:w-auto border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
 						hx-get="/products"
 						hx-target="#product-table-container"
 						hx-swap="outerHTML"
@@ -361,7 +364,7 @@ templ ProductPage(data ProductPageData) {
 					<select
 						name="limit"
 						title="Jumlah Baris"
-						class="border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						class="w-full sm:w-auto border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
 						hx-get="/products"
 						hx-target="#product-table-container"
 						hx-swap="outerHTML"
@@ -382,16 +385,16 @@ templ ProductPage(data ProductPageData) {
 				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/50 backdrop-blur-xs"
 				@click.self="showPrintModal = false"
 			>
-				<div class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-md overflow-hidden p-6 space-y-4 my-auto sm:my-8">
+				<div class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-md overflow-hidden p-4 sm:p-6 space-y-4 my-auto sm:my-8">
 					<div class="flex items-center justify-between pb-3 border-b border-[#E5E5EA]">
 						<div class="flex items-center gap-2">
 							<div class="w-8 h-8 rounded-full bg-[#007AFF]/15 flex items-center justify-center text-[#007AFF]">
-								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
 							</div>
 							<h3 class="font-bold text-[#1D1D1F]">Cetak Label Harga / Barcode</h3>
 						</div>
 						<button type="button" @click="showPrintModal = false" class="text-[#8E8E93] hover:text-[#1D1D1F] p-1 rounded-lg">
-							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path></svg>
 						</button>
 					</div>
 					<div class="space-y-3">
@@ -460,7 +463,7 @@ templ ProductPage(data ProductPageData) {
 				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/40 backdrop-blur-xs"
 				@click.self="showStockCardModal = false"
 			>
-				<div class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-3xl overflow-hidden p-6 space-y-4 max-h-[90vh] flex flex-col my-auto sm:my-8">
+				<div class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-3xl overflow-hidden p-4 sm:p-6 space-y-4 max-h-[90vh] flex flex-col my-auto sm:my-8">
 					<div class="flex items-center justify-between pb-3 border-b border-[#E5E5EA] flex-shrink-0">
 						<div class="flex items-center gap-3 min-w-0">
 							<div class="w-9 h-9 rounded-xl bg-[#007AFF]/10 flex items-center justify-center text-[#007AFF] flex-shrink-0">
@@ -484,7 +487,7 @@ templ ProductPage(data ProductPageData) {
 						</template>
 						<template x-if="stockCardData">
 							<div class="space-y-4">
-								<div class="grid grid-cols-3 gap-3 p-3.5 bg-[#F5F5F7] rounded-xl border border-[#E5E5EA] text-center">
+								<div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 p-3 sm:p-3.5 bg-[#F5F5F7] rounded-xl border border-[#E5E5EA] text-center">
 									<div>
 										<span class="text-[#8E8E93] block text-[11px]">Stok Fisik Saat Ini</span>
 										<span class="font-bold text-[#1D1D1F] text-sm tabular-nums" x-text="stockCardData.current_stock + ' ' + stockCardData.base_unit"></span>
@@ -606,17 +609,17 @@ templ ProductPage(data ProductPageData) {
 							</div>
 						</template>
 					</div>
-					<div class="pt-3 border-t border-[#E5E5EA] flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
-						<div class="flex items-center gap-2" x-show="stockCardData && stockCardData.type === 'barang'">
+					<div class="pt-3 border-t border-[#E5E5EA] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 flex-shrink-0">
+						<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2" x-show="stockCardData && stockCardData.type === 'barang'">
 							<a
 								:href="stockCardData ? ('/stock-adjustments?mode=opname&product_id=' + stockCardData.product_id) : '/stock-adjustments'"
-								class="min-h-[40px] px-3.5 rounded-xl bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 font-semibold text-xs inline-flex items-center gap-1.5 transition"
+								class="min-h-[40px] px-3.5 rounded-xl bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 font-semibold text-xs inline-flex items-center justify-center gap-1.5 transition text-center"
 							>
 								<span>Stok Opname</span>
 							</a>
 							<a
 								:href="stockCardData ? ('/stock-adjustments?mode=pemakaian&product_id=' + stockCardData.product_id) : '/stock-adjustments'"
-								class="min-h-[40px] px-3.5 rounded-xl bg-[#FF9500]/15 text-[#B26A00] hover:bg-[#FF9500]/25 font-semibold text-xs inline-flex items-center gap-1.5 transition"
+								class="min-h-[40px] px-3.5 rounded-xl bg-[#FF9500]/15 text-[#B26A00] hover:bg-[#FF9500]/25 font-semibold text-xs inline-flex items-center justify-center gap-1.5 transition text-center"
 							>
 								<span>Catat Pemakaian / Rusak</span>
 							</a>
@@ -624,7 +627,7 @@ templ ProductPage(data ProductPageData) {
 						<button
 							type="button"
 							@click="showStockCardModal = false"
-							class="min-h-[40px] px-5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-semibold text-xs hover:bg-[#F5F5F7] transition ml-auto"
+							class="min-h-[40px] px-5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-semibold text-xs hover:bg-[#F5F5F7] transition w-full sm:w-auto ml-auto text-center"
 						>
 							Tutup
 						</button>
@@ -882,7 +885,8 @@ templ CreateProductPage(categories []repo.Category) {
 
 templ ProductTable(data ProductPageData) {
 	<div id="product-table-container" class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] overflow-hidden mt-4">
-		<div class="overflow-x-auto">
+		<!-- Desktop & Tablet Table View (hidden on small mobile screens) -->
+		<div class="hidden sm:block overflow-x-auto">
 			<table class="w-full text-left border-collapse">
 				<thead class="bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]">
 					<tr>
@@ -909,7 +913,7 @@ templ ProductTable(data ProductPageData) {
 								if p.Type == "barang" && p.CurrentStock <= 0 {
 									<div class="inline-flex flex-col items-end">
 										<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FF3B30]/15 text-[#FF3B30]">
-											<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+											<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"></path></svg>
 											Habis (0)
 										</span>
 										<span class="text-[11px] text-[#8E8E93] mt-0.5 tabular-nums">Min: { fmt.Sprint(p.MinStock) }</span>
@@ -917,7 +921,7 @@ templ ProductTable(data ProductPageData) {
 								} else if p.Type == "barang" && p.CurrentStock <= p.MinStock {
 									<div class="inline-flex flex-col items-end">
 										<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FF9500]/15 text-[#FF9500]">
-											<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+											<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"></path></svg>
 											{ fmt.Sprint(p.CurrentStock) } (Menipis)
 										</span>
 										<span class="text-[11px] text-[#8E8E93] mt-0.5 tabular-nums">Min: { fmt.Sprint(p.MinStock) }</span>
@@ -940,7 +944,7 @@ templ ProductTable(data ProductPageData) {
 											class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#FF9500]/15 text-[#B26A00] hover:bg-[#FF9500]/25 transition"
 											title="HPP belum diisi. Klik untuk mengisi atau akan otomatis terisi saat penerimaan barang."
 										>
-											<svg class="w-3.5 h-3.5 flex-shrink-0 text-[#FF9500]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+											<svg class="w-3.5 h-3.5 flex-shrink-0 text-[#FF9500]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"></path></svg>
 											<span>Belum Diisi</span>
 										</a>
 									} else if utils.NumericToFloat(p.Price) > 0 && utils.NumericToFloat(p.AverageCost) > utils.NumericToFloat(p.Price) {
@@ -979,14 +983,14 @@ templ ProductTable(data ProductPageData) {
 										class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#34C759]/10 text-[#34C759] hover:bg-[#34C759]/20 rounded-xl transition"
 										title="Cetak Label Harga / Barcode"
 									>
-										<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+										<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
 									</button>
 									<a
 										href={ templ.SafeURL(fmt.Sprintf("/products/%d/edit", p.ProductID)) }
 										class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 rounded-xl transition"
 										title="Ubah Produk"
 									>
-										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
 											<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"></path>
 										</svg>
 									</a>
@@ -1004,14 +1008,137 @@ templ ProductTable(data ProductPageData) {
 				</tbody>
 			</table>
 		</div>
+
+		<!-- Mobile Card List View (visible on small mobile screens) -->
+		<div class="sm:hidden divide-y divide-[#E5E5EA]">
+			for _, p := range data.Products {
+				<div class="p-4 space-y-3 hover:bg-[#F5F5F7]/40 transition">
+					<div class="flex items-start justify-between gap-2.5">
+						<div class="min-w-0 flex-1">
+							<div class="flex items-center gap-1.5 flex-wrap mb-1">
+								if p.CategoryName.String != "" {
+									<span class="text-[11px] font-medium text-[#8E8E93] bg-[#F5F5F7] px-2 py-0.5 rounded-md border border-[#E5E5EA]">
+										{ p.CategoryName.String }
+									</span>
+								}
+								<span class="text-[11px] text-[#8E8E93] bg-[#F5F5F7] px-2 py-0.5 rounded-md border border-[#E5E5EA]">
+									{ p.Type }
+								</span>
+							</div>
+							<h4 class="font-bold text-[#1D1D1F] text-base leading-snug break-words">
+								{ p.ProductName }
+							</h4>
+							<p class="font-mono text-xs text-[#8E8E93] mt-0.5">{ p.Sku }</p>
+						</div>
+						<div class="text-right flex-shrink-0">
+							<span class="text-base font-bold text-[#34C759] tabular-nums block">
+								Rp { utils.FormatRupiah(p.Price) }
+							</span>
+							<span class="text-xs text-[#8E8E93] block">/ { p.UnitName.String }</span>
+						</div>
+					</div>
+
+					<!-- Stock and HPP Info Row -->
+					<div class="flex items-center justify-between text-xs bg-[#F5F5F7]/80 rounded-xl p-2.5 gap-2">
+						<div>
+							<span class="text-[#8E8E93] block text-[11px]">Stok:</span>
+							if p.Type == "barang" && p.CurrentStock <= 0 {
+								<span class="inline-flex items-center gap-1 font-bold text-[#FF3B30]">
+									Habis (0)
+								</span>
+							} else if p.Type == "barang" && p.CurrentStock <= p.MinStock {
+								<span class="inline-flex items-center gap-1 font-bold text-[#FF9500]">
+									{ fmt.Sprint(p.CurrentStock) } (Menipis)
+								</span>
+							} else if p.Type == "barang" {
+								<span class="font-bold text-[#1D1D1F] tabular-nums">
+									{ fmt.Sprint(p.CurrentStock) } { p.UnitName.String }
+								</span>
+							} else {
+								<span class="text-[#8E8E93] italic">Non-Stok</span>
+							}
+							if p.Type == "barang" {
+								<span class="text-[10px] text-[#8E8E93] ml-1 tabular-nums">(Min: { fmt.Sprint(p.MinStock) })</span>
+							}
+						</div>
+						<div class="text-right">
+							<span class="text-[#8E8E93] block text-[11px]">HPP (Modal):</span>
+							if p.Type == "barang" {
+								if utils.NumericToFloat(p.AverageCost) <= 0 {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%d/edit", p.ProductID)) }
+										class="text-[#FF9500] font-semibold text-[11px] underline"
+									>
+										Belum Diisi
+									</a>
+								} else if utils.NumericToFloat(p.Price) > 0 && utils.NumericToFloat(p.AverageCost) > utils.NumericToFloat(p.Price) {
+									<span class="font-medium text-[#FF3B30] tabular-nums">Rp { utils.FormatRupiah(p.AverageCost) }</span>
+								} else {
+									<span class="font-medium text-[#1D1D1F] tabular-nums">Rp { utils.FormatRupiah(p.AverageCost) }</span>
+								}
+							} else {
+								<span class="text-[#8E8E93] italic">-</span>
+							}
+						</div>
+					</div>
+
+					<!-- Mobile Action Buttons -->
+					<div class="flex items-center gap-2 pt-1">
+						if p.Type == "barang" {
+							<button
+								type="button"
+								@click={ fmt.Sprintf("openStockCardModal(%d)", p.ProductID) }
+								class="flex-1 min-h-[40px] inline-flex items-center justify-center gap-1.5 bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA] rounded-xl text-xs font-semibold transition"
+								title="Kartu Stok / Riwayat Mutasi"
+							>
+								<svg class="w-4 h-4 text-[#8E8E93]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z"></path>
+								</svg>
+								<span>Kartu Stok</span>
+							</button>
+						}
+						<button
+							type="button"
+							data-id={ fmt.Sprint(p.ProductID) }
+							data-name={ p.ProductName }
+							data-sku={ p.Sku }
+							@click="openPrintModal(parseInt($el.dataset.id), $el.dataset.name, $el.dataset.sku)"
+							class="flex-1 min-h-[40px] inline-flex items-center justify-center gap-1.5 bg-[#34C759]/10 text-[#34C759] hover:bg-[#34C759]/20 rounded-xl text-xs font-semibold transition"
+							title="Cetak Label Harga / Barcode"
+						>
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+							</svg>
+							<span>Label</span>
+						</button>
+						<a
+							href={ templ.SafeURL(fmt.Sprintf("/products/%d/edit", p.ProductID)) }
+							class="flex-1 min-h-[40px] inline-flex items-center justify-center gap-1.5 bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 rounded-xl text-xs font-semibold transition"
+							title="Ubah Produk"
+						>
+							<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"></path>
+							</svg>
+							<span>Ubah</span>
+						</a>
+					</div>
+				</div>
+			}
+			if len(data.Products) == 0 {
+				<div class="p-8 text-center text-[#8E8E93]">
+					Tidak ada produk yang ditemukan.
+				</div>
+			}
+		</div>
+
 		if data.TotalPages > 1 {
-			<div class="px-6 py-4 border-t border-[#E5E5EA] flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left bg-[#F5F5F7]/50">
-				<div class="text-sm text-[#8E8E93] tabular-nums">
+			<div class="px-4 sm:px-6 py-4 border-t border-[#E5E5EA] flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left bg-[#F5F5F7]/50">
+				<div class="text-xs sm:text-sm text-[#8E8E93] tabular-nums">
 					Menampilkan <span class="font-medium text-[#1D1D1F]">{ fmt.Sprint((data.Page - 1) * data.Limit + 1) }</span> sampai <span class="font-medium text-[#1D1D1F]">{ fmt.Sprint(min(data.Page * data.Limit, int(data.TotalRows))) }</span> dari <span class="font-medium text-[#1D1D1F]">{ fmt.Sprint(data.TotalRows) }</span> data
 				</div>
-				<div class="flex gap-2">
+				<div class="flex gap-2 w-full sm:w-auto justify-center">
 					<button
-						class="px-4 min-h-[44px] border border-[#E5E5EA] rounded-xl bg-white text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-50 transition"
+						class="flex-1 sm:flex-initial px-4 min-h-[44px] border border-[#E5E5EA] rounded-xl bg-white text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-50 transition"
 						disabled?={ data.Page <= 1 }
 						hx-get={ string(templ.SafeURL(fmt.Sprintf("/products?page=%d", data.Page-1))) }
 						hx-target="#product-table-container"
@@ -1021,7 +1148,7 @@ templ ProductTable(data ProductPageData) {
 						Sebelumnya
 					</button>
 					<button
-						class="px-4 min-h-[44px] border border-[#E5E5EA] rounded-xl bg-white text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-50 transition"
+						class="flex-1 sm:flex-initial px-4 min-h-[44px] border border-[#E5E5EA] rounded-xl bg-white text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-50 transition"
 						disabled?={ data.Page >= data.TotalPages }
 						hx-get={ string(templ.SafeURL(fmt.Sprintf("/products?page=%d", data.Page+1))) }
 						hx-target="#product-table-container"

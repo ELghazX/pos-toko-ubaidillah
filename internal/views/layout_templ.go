@@ -44,7 +44,15 @@ func Base(pageTitle string, activeMenu string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><link href=\"/css/style.css\" rel=\"stylesheet\"><script src=\"https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js\" integrity=\"sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg\" crossorigin=\"anonymous\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script><script src=\"https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4\"></script><style>\n\t\t\t\t[x-cloak] { display: none !important; }\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: -apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"SF Pro Text\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n\t\t\t\t}\n\t\t\t\tselect {\n\t\t\t\t\tappearance: none;\n\t\t\t\t\t-webkit-appearance: none;\n\t\t\t\t\tbackground-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%238E8E93'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19.5 8.25-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E\");\n\t\t\t\t\tbackground-repeat: no-repeat;\n\t\t\t\t\tbackground-position: right 0.75rem center;\n\t\t\t\t\tbackground-size: 1rem 1rem;\n\t\t\t\t\tpadding-right: 2.25rem !important;\n\t\t\t\t}\n\t\t\t\t@media print {\n\t\t\t\t\t.no-print { display: none !important; }\n\t\t\t\t\taside, header { display: none !important; }\n\t\t\t\t\tbody {\n\t\t\t\t\t\tbackground: #FFFFFF !important;\n\t\t\t\t\t\theight: auto !important;\n\t\t\t\t\t\toverflow: visible !important;\n\t\t\t\t\t}\n\t\t\t\t\tmain {\n\t\t\t\t\t\toverflow: visible !important;\n\t\t\t\t\t\theight: auto !important;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t</style></head><body hx-boost=\"true\" class=\"bg-[#F5F5F7] text-[#1D1D1F] antialiased h-[100dvh] min-h-[100dvh] flex overflow-hidden\"><div x-data=\"{ sidebarOpen: false, sidebarFolded: false }\" class=\"flex w-full h-full flex-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><link href=\"/css/style.css\" rel=\"stylesheet\"><script src=\"https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js\" integrity=\"sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg\" crossorigin=\"anonymous\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script><script src=\"https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4\"></script><style>\n\t\t\t\t[x-cloak] { display: none !important; }\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: -apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"SF Pro Text\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n\t\t\t\t}\n\t\t\t\tselect {\n\t\t\t\t\tappearance: none;\n\t\t\t\t\t-webkit-appearance: none;\n\t\t\t\t\tbackground-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%238E8E93'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19.5 8.25-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E\");\n\t\t\t\t\tbackground-repeat: no-repeat;\n\t\t\t\t\tbackground-position: right 0.75rem center;\n\t\t\t\t\tbackground-size: 1rem 1rem;\n\t\t\t\t\tpadding-right: 2.25rem !important;\n\t\t\t\t}\n\t\t\t\t@media print {\n\t\t\t\t\t.no-print { display: none !important; }\n\t\t\t\t\taside, header { display: none !important; }\n\t\t\t\t\tbody {\n\t\t\t\t\t\tbackground: #FFFFFF !important;\n\t\t\t\t\t\theight: auto !important;\n\t\t\t\t\t\toverflow: visible !important;\n\t\t\t\t\t}\n\t\t\t\t\tmain {\n\t\t\t\t\t\toverflow: visible !important;\n\t\t\t\t\t\theight: auto !important;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t</style></head><body hx-boost=\"true\" class=\"bg-[#F5F5F7] text-[#1D1D1F] antialiased h-[100dvh] min-h-[100dvh] flex overflow-hidden\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = ToastAndErrorHandler().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div x-data=\"{ sidebarOpen: false, sidebarFolded: false }\" class=\"flex w-full h-full flex-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -52,20 +60,20 @@ func Base(pageTitle string, activeMenu string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"flex-1 flex flex-col h-[100dvh] overflow-hidden\"><header class=\"bg-white/80 backdrop-blur-xl border-b border-[#E5E5EA] h-16 flex items-center px-4 lg:hidden\"><button @click=\"sidebarOpen = true\" class=\"min-w-[44px] min-h-[44px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#1D1D1F] focus:outline-none\"><svg class=\"w-6 h-6\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 6h16M4 12h16M4 18h16\"></path></svg></button><h1 class=\"ml-3 text-lg font-bold text-[#1D1D1F] truncate\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"flex-1 flex flex-col h-[100dvh] overflow-hidden\"><header class=\"bg-white/80 backdrop-blur-xl border-b border-[#E5E5EA] h-16 flex items-center px-4 lg:hidden\"><button @click=\"sidebarOpen = true\" class=\"min-w-[44px] min-h-[44px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#1D1D1F] focus:outline-none\"><svg class=\"w-6 h-6\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 6h16M4 12h16M4 18h16\"></path></svg></button><h1 class=\"ml-3 text-lg font-bold text-[#1D1D1F] truncate\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(pageTitle)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 53, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 54, Col: 76}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</h1></header><main class=\"flex-1 overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom,0px))] sm:pb-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</h1></header><main class=\"flex-1 overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom,0px))] sm:pb-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -73,7 +81,7 @@ func Base(pageTitle string, activeMenu string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</main></div></div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</main></div></div></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -102,20 +110,24 @@ func POSLayout(pageTitle string) templ.Component {
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<!doctype html><html lang=\"id\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<!doctype html><html lang=\"id\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(pageTitle)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 70, Col: 21}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 71, Col: 21}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</title><link href=\"/css/style.css\" rel=\"stylesheet\"><script src=\"https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js\" integrity=\"sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg\" crossorigin=\"anonymous\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script><script src=\"https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4\"></script><style>\n\t\t\t\t[x-cloak] { display: none !important; }\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: -apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"SF Pro Text\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n\t\t\t\t}\n\t\t\t\tselect {\n\t\t\t\t\tappearance: none;\n\t\t\t\t\t-webkit-appearance: none;\n\t\t\t\t\tbackground-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%238E8E93'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19.5 8.25-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E\");\n\t\t\t\t\tbackground-repeat: no-repeat;\n\t\t\t\t\tbackground-position: right 0.75rem center;\n\t\t\t\t\tbackground-size: 1rem 1rem;\n\t\t\t\t\tpadding-right: 2.25rem !important;\n\t\t\t\t}\n\t\t\t</style></head><body hx-boost=\"true\" class=\"bg-[#F5F5F7] text-[#1D1D1F] antialiased h-[100dvh] min-h-[100dvh] flex overflow-hidden\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</title><link href=\"/css/style.css\" rel=\"stylesheet\"><script src=\"https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js\" integrity=\"sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg\" crossorigin=\"anonymous\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script><script src=\"https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4\"></script><style>\n\t\t\t\t[x-cloak] { display: none !important; }\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: -apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"SF Pro Text\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n\t\t\t\t}\n\t\t\t\tselect {\n\t\t\t\t\tappearance: none;\n\t\t\t\t\t-webkit-appearance: none;\n\t\t\t\t\tbackground-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%238E8E93'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19.5 8.25-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E\");\n\t\t\t\t\tbackground-repeat: no-repeat;\n\t\t\t\t\tbackground-position: right 0.75rem center;\n\t\t\t\t\tbackground-size: 1rem 1rem;\n\t\t\t\t\tpadding-right: 2.25rem !important;\n\t\t\t\t}\n\t\t\t</style></head><body hx-boost=\"true\" class=\"bg-[#F5F5F7] text-[#1D1D1F] antialiased h-[100dvh] min-h-[100dvh] flex overflow-hidden\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = ToastAndErrorHandler().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -123,7 +135,36 @@ func POSLayout(pageTitle string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</body></html>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+func ToastAndErrorHandler() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var6 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var6 == nil {
+			templ_7745c5c3_Var6 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div id=\"toast-container\" class=\"fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center gap-2 pointer-events-none transition-all duration-300 w-full max-w-sm px-4\"></div><script>\n\t\tif (!window.showToast) {\n\t\t\twindow.showToast = function(message, type = 'error') {\n\t\t\t\tvar container = document.getElementById('toast-container');\n\t\t\t\tif (!container) {\n\t\t\t\t\tcontainer = document.createElement('div');\n\t\t\t\t\tcontainer.id = 'toast-container';\n\t\t\t\t\tcontainer.className = 'fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center gap-2 pointer-events-none transition-all duration-300 w-full max-w-sm px-4';\n\t\t\t\t\tdocument.body.appendChild(container);\n\t\t\t\t}\n\t\t\t\tvar toast = document.createElement('div');\n\t\t\t\tvar isErr = type === 'error';\n\t\t\t\ttoast.className = 'pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-lg border text-sm font-medium transition-all duration-300 transform -translate-y-2 opacity-0 bg-white/95 backdrop-blur-xl ' + \n\t\t\t\t\t(isErr ? 'text-[#FF3B30] border-[#FF3B30]/20' : 'text-[#34C759] border-[#34C759]/20');\n\t\t\t\t\n\t\t\t\tvar icon = isErr \n\t\t\t\t\t? '<svg class=\"w-5 h-5 flex-shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z\"/></svg>'\n\t\t\t\t\t: '<svg class=\"w-5 h-5 flex-shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"/></svg>';\n\t\t\t\t\n\t\t\t\ttoast.innerHTML = icon + '<span class=\"text-[#1D1D1F]\">' + (message || '') + '</span>';\n\t\t\t\tcontainer.appendChild(toast);\n\t\t\t\t\n\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\ttoast.classList.remove('-translate-y-2', 'opacity-0');\n\t\t\t\t\ttoast.classList.add('translate-y-0', 'opacity-100');\n\t\t\t\t});\n\n\t\t\t\tsetTimeout(function() {\n\t\t\t\t\ttoast.classList.add('opacity-0', '-translate-y-2');\n\t\t\t\t\tsetTimeout(function() { toast.remove(); }, 300);\n\t\t\t\t}, 4000);\n\t\t\t};\n\t\t}\n\n\t\tif (!window.__htmxErrorHandlersInitialized) {\n\t\t\twindow.__htmxErrorHandlersInitialized = true;\n\n\t\t\tdocument.addEventListener('htmx:responseError', function(evt) {\n\t\t\t\tvar xhr = evt.detail.xhr;\n\t\t\t\tvar rawText = (xhr && xhr.responseText) ? xhr.responseText.trim() : '';\n\t\t\t\tvar message = rawText;\n\t\t\t\t\n\t\t\t\tif (!message || message.startsWith('<') || message.length > 300) {\n\t\t\t\t\tif (xhr && xhr.status === 404) {\n\t\t\t\t\t\tmessage = 'Data tidak ditemukan.';\n\t\t\t\t\t} else if (xhr && xhr.status === 403) {\n\t\t\t\t\t\tmessage = 'Akses ditolak.';\n\t\t\t\t\t} else {\n\t\t\t\t\t\tmessage = 'Terjadi kesalahan pada sistem. Silakan periksa kembali input Anda.';\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\tif (window.showToast) {\n\t\t\t\t\twindow.showToast(message, 'error');\n\t\t\t\t}\n\n\t\t\t\tvar elt = evt.detail.elt;\n\t\t\t\tvar form = elt ? (elt.tagName === 'FORM' ? elt : elt.closest('form')) : null;\n\t\t\t\tif (form) {\n\t\t\t\t\tform.querySelectorAll('button[type=\"submit\"]').forEach(function(btn) {\n\t\t\t\t\t\tbtn.disabled = false;\n\t\t\t\t\t});\n\t\t\t\t}\n\t\t\t});\n\n\t\t\tdocument.addEventListener('htmx:sendError', function() {\n\t\t\t\tif (window.showToast) {\n\t\t\t\t\twindow.showToast('Gagal terhubung ke server. Periksa koneksi internet Anda.', 'error');\n\t\t\t\t}\n\t\t\t});\n\n\t\t\tdocument.addEventListener('htmx:beforeRequest', function(evt) {\n\t\t\t\tvar elt = evt.detail.elt;\n\t\t\t\tvar form = elt ? (elt.tagName === 'FORM' ? elt : elt.closest('form')) : null;\n\t\t\t\tif (form) {\n\t\t\t\t\tvar errorContainer = form.querySelector('[data-form-error]');\n\t\t\t\t\tif (errorContainer) {\n\t\t\t\t\t\terrorContainer.classList.add('hidden');\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t});\n\n\t\t\tdocument.addEventListener('input', function(evt) {\n\t\t\t\tvar form = evt.target.closest('form');\n\t\t\t\tif (form) {\n\t\t\t\t\tvar errorContainer = form.querySelector('[data-form-error]');\n\t\t\t\t\tif (errorContainer && !errorContainer.classList.contains('hidden')) {\n\t\t\t\t\t\terrorContainer.classList.add('hidden');\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t});\n\t\t}\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

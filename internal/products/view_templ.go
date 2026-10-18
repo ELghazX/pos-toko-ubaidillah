@@ -253,25 +253,25 @@ func ProductPage(data ProductPageData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\"><div class=\"flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6\"><div><h1 class=\"text-3xl font-bold text-[#1D1D1F] tracking-tight\">Daftar Produk &amp; Jasa</h1><p class=\"text-sm text-[#8E8E93] mt-1\">Kelola data produk, barcode, multi-satuan, dan stok gudang</p></div><div class=\"flex shrink-0 items-center gap-2.5\"><a href=\"/stock-adjustments\" class=\"bg-white border border-[#E5E5EA] text-[#1D1D1F] px-4 min-h-[44px] inline-flex items-center gap-2 rounded-xl text-sm font-medium hover:bg-[#F5F5F7] transition shadow-xs\" title=\"Stok Opname &amp; Pemakaian Barang\"><svg class=\"w-4 h-4 text-[#007AFF]\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4\"></path></svg> <span>Stok Opname &amp; Pakai</span></a> <a href=\"/products/print-labels\" class=\"bg-white border border-[#E5E5EA] text-[#1D1D1F] px-4 min-h-[44px] inline-flex items-center gap-2 rounded-xl text-sm font-medium hover:bg-[#F5F5F7] transition shadow-xs\" title=\"Cetak Label Harga &amp; Barcode Rak Massal\"><svg class=\"w-4 h-4 text-[#007AFF]\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z\"></path></svg> <span>Cetak Label Rak</span></a> <button id=\"btn-sync-stock\" type=\"button\" @click=\"startStream()\" :disabled=\"syncing\" class=\"bg-white border border-[#E5E5EA] text-[#1D1D1F] px-4 min-h-[44px] inline-flex items-center gap-2 rounded-xl text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-60 disabled:cursor-not-allowed transition shadow-xs\" title=\"Hitung ulang stok dari inventory ledger\"><template x-if=\"!syncing\"><svg class=\"w-4 h-4 text-[#007AFF]\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15\"></path></svg></template><template x-if=\"syncing\"><svg class=\"w-4 h-4 text-[#007AFF] animate-spin\" fill=\"none\" viewBox=\"0 0 24 24\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\"></circle><path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8v8H4z\"></path></svg></template><span x-text=\"syncing ? 'Menyinkronkan...' : 'Update Stok Ledger'\">Update Stok Ledger</span></button> <a href=\"/products/new\" class=\"bg-[#007AFF] text-white px-5 min-h-[44px] inline-flex items-center rounded-xl font-medium hover:bg-[#0066D6] transition shadow-xs\">+ Tambah Produk</a></div></div><div x-show=\"syncing\" x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0 -translate-y-2\" x-transition:enter-end=\"opacity-100 translate-y-0\" x-transition:leave=\"transition ease-in duration-200\" x-transition:leave-start=\"opacity-100 translate-y-0\" x-transition:leave-end=\"opacity-0 -translate-y-2\" x-cloak class=\"mb-5 p-4 bg-white rounded-2xl border border-[#E5E5EA] shadow-xs space-y-2.5\"><div class=\"flex items-center justify-between text-xs gap-3\"><div class=\"flex items-center gap-2 min-w-0\"><template x-if=\"!isDone\"><svg class=\"animate-spin h-4 w-4 text-[#007AFF] flex-shrink-0\" viewBox=\"0 0 24 24\" fill=\"none\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\"></circle><path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8v8H4z\"></path></svg></template><template x-if=\"isDone\"><svg class=\"h-4 w-4 text-[#34C759] flex-shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M5 13l4 4L19 7\"></path></svg></template><div class=\"min-w-0\"><span class=\"font-semibold block truncate\" :class=\"isDone ? 'text-[#34C759]' : 'text-[#1D1D1F]'\" x-text=\"isDone ? currentProduct : 'Sedang mengupdate: ' + currentProduct\"></span> <span x-show=\"!isDone && totalItems > 0\" class=\"text-[#8E8E93] text-[11px] block mt-0.5 tabular-nums\" x-text=\"'Barang ke-' + currentIndex + ' dari ' + totalItems + ' total produk'\"></span></div></div><span class=\"font-mono font-semibold text-sm flex-shrink-0\" :class=\"isDone ? 'text-[#34C759]' : 'text-[#007AFF]'\" x-text=\"progress + '%'\"></span></div><div class=\"w-full bg-[#F5F5F7] rounded-full h-2 overflow-hidden border border-[#E5E5EA]\"><div class=\"h-2 rounded-full transition-all duration-150\" :class=\"isDone ? 'bg-[#34C759]' : 'bg-[#007AFF]'\" :style=\"'width: ' + progress + '%'\"></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\"><div class=\"flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6\"><div><h1 class=\"text-2xl sm:text-3xl font-bold text-[#1D1D1F] tracking-tight\">Daftar Produk &amp; Jasa</h1><p class=\"text-xs sm:text-sm text-[#8E8E93] mt-1\">Kelola data produk, barcode, multi-satuan, dan stok gudang</p></div><div class=\"grid grid-cols-2 sm:flex sm:flex-wrap sm:shrink-0 items-center gap-2 sm:gap-2.5 w-full sm:w-auto\"><a href=\"/products/new\" class=\"col-span-2 sm:col-span-1 order-first sm:order-last bg-[#007AFF] text-white px-4 min-h-[44px] inline-flex items-center justify-center rounded-xl font-medium hover:bg-[#0066D6] transition shadow-xs w-full sm:w-auto\">+ Tambah Produk</a> <a href=\"/stock-adjustments\" class=\"bg-white border border-[#E5E5EA] text-[#1D1D1F] px-3 sm:px-4 min-h-[44px] inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-[#F5F5F7] transition shadow-xs text-center\" title=\"Stok Opname &amp; Pemakaian Barang\"><svg class=\"w-4 h-4 text-[#007AFF] flex-shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4\"></path></svg> <span class=\"truncate\">Opname &amp; Pakai</span></a> <a href=\"/products/print-labels\" class=\"bg-white border border-[#E5E5EA] text-[#1D1D1F] px-3 sm:px-4 min-h-[44px] inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-[#F5F5F7] transition shadow-xs text-center\" title=\"Cetak Label Harga &amp; Barcode Rak Massal\"><svg class=\"w-4 h-4 text-[#007AFF] flex-shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z\"></path></svg> <span class=\"truncate\">Cetak Label</span></a> <button id=\"btn-sync-stock\" type=\"button\" @click=\"startStream()\" :disabled=\"syncing\" class=\"col-span-2 sm:col-span-1 bg-white border border-[#E5E5EA] text-[#1D1D1F] px-3 sm:px-4 min-h-[44px] inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-60 disabled:cursor-not-allowed transition shadow-xs text-center\" title=\"Hitung ulang stok dari inventory ledger\"><template x-if=\"!syncing\"><svg class=\"w-4 h-4 text-[#007AFF] flex-shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99\"></path></svg></template><template x-if=\"syncing\"><svg class=\"w-4 h-4 text-[#007AFF] animate-spin flex-shrink-0\" fill=\"none\" viewBox=\"0 0 24 24\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\"></circle><path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8v8H4z\"></path></svg></template><span x-text=\"syncing ? 'Menyinkronkan...' : 'Update Stok Ledger'\" class=\"truncate\">Update Stok Ledger</span></button></div></div><div x-show=\"syncing\" x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0 -translate-y-2\" x-transition:enter-end=\"opacity-100 translate-y-0\" x-transition:leave=\"transition ease-in duration-200\" x-transition:leave-start=\"opacity-100 translate-y-0\" x-transition:leave-end=\"opacity-0 -translate-y-2\" x-cloak class=\"mb-5 p-4 bg-white rounded-2xl border border-[#E5E5EA] shadow-xs space-y-2.5\"><div class=\"flex items-center justify-between text-xs gap-3\"><div class=\"flex items-center gap-2 min-w-0\"><template x-if=\"!isDone\"><svg class=\"animate-spin h-4 w-4 text-[#007AFF] flex-shrink-0\" viewBox=\"0 0 24 24\" fill=\"none\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\"></circle><path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8v8H4z\"></path></svg></template><template x-if=\"isDone\"><svg class=\"h-4 w-4 text-[#34C759] flex-shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M5 13l4 4L19 7\"></path></svg></template><div class=\"min-w-0\"><span class=\"font-semibold block truncate\" :class=\"isDone ? 'text-[#34C759]' : 'text-[#1D1D1F]'\" x-text=\"isDone ? currentProduct : 'Sedang mengupdate: ' + currentProduct\"></span> <span x-show=\"!isDone && totalItems > 0\" class=\"text-[#8E8E93] text-[11px] block mt-0.5 tabular-nums\" x-text=\"'Barang ke-' + currentIndex + ' dari ' + totalItems + ' total produk'\"></span></div></div><span class=\"font-mono font-semibold text-sm flex-shrink-0\" :class=\"isDone ? 'text-[#34C759]' : 'text-[#007AFF]'\" x-text=\"progress + '%'\"></span></div><div class=\"w-full bg-[#F5F5F7] rounded-full h-2 overflow-hidden border border-[#E5E5EA]\"><div class=\"h-2 rounded-full transition-all duration-150\" :class=\"isDone ? 'bg-[#34C759]' : 'bg-[#007AFF]'\" :style=\"'width: ' + progress + '%'\"></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if data.LowStockCount > 0 && data.StockFilter != "low_stock" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"mb-5 p-4 bg-[#FF9500]/10 border border-[#FF9500]/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm\"><div class=\"flex items-center gap-3 text-[#B26A00]\"><div class=\"w-8 h-8 rounded-full bg-[#FF9500]/20 flex items-center justify-center flex-shrink-0 text-[#FF9500]\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z\"></path></svg></div><div><p class=\"font-bold text-[#1D1D1F]\">Peringatan Stok Menipis</p><p class=\"text-xs text-[#8E8E93] mt-0.5\">Ada <strong class=\"text-[#FF9500] font-semibold\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"mb-5 p-4 bg-[#FF9500]/10 border border-[#FF9500]/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm\"><div class=\"flex items-center gap-3 text-[#B26A00]\"><div class=\"w-8 h-8 rounded-full bg-[#FF9500]/20 flex items-center justify-center flex-shrink-0 text-[#FF9500]\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z\"></path></svg></div><div><p class=\"font-bold text-[#1D1D1F]\">Peringatan Stok Menipis</p><p class=\"text-xs text-[#8E8E93] mt-0.5\">Ada <strong class=\"text-[#FF9500] font-semibold\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(data.LowStockCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 273, Col: 129}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 276, Col: 129}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " produk</strong> yang stoknya sudah di bawah batas minimum atau habis.</p></div></div><a href=\"/products?stock_filter=low_stock\" class=\"px-4 min-h-[44px] inline-flex items-center justify-center bg-[#FF9500] hover:bg-[#E08500] text-white font-semibold rounded-xl text-xs transition text-center whitespace-nowrap shadow-xs\">Lihat Produk Menipis &rarr;</a></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " produk</strong> yang stoknya sudah di bawah batas minimum atau habis.</p></div></div><a href=\"/products?stock_filter=low_stock\" class=\"px-4 min-h-[44px] inline-flex items-center justify-center bg-[#FF9500] hover:bg-[#E08500] text-white font-semibold rounded-xl text-xs transition text-center whitespace-nowrap shadow-xs w-full sm:w-auto\">Lihat Produk Menipis &rarr;</a></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -283,13 +283,13 @@ func ProductPage(data ProductPageData) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.Query)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 289, Col: 24}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 292, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" placeholder=\"Cari nama atau SKU produk...\" class=\"w-full pl-10 pr-4 min-h-[44px] bg-white border border-[#E5E5EA] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]\" hx-get=\"/products\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-trigger=\"keyup changed delay:400ms, search\" hx-include=\"[name='category_id'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']\"> <svg class=\"w-5 h-5 text-[#8E8E93] absolute left-3.5 top-3\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z\"></path></svg></div><div class=\"flex flex-wrap justify-end gap-2.5 text-sm\"><select name=\"category_id\" class=\"border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]\" hx-get=\"/products\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']\"><option value=\"0\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" placeholder=\"Cari nama atau SKU produk...\" class=\"w-full pl-10 pr-4 min-h-[44px] bg-white border border-[#E5E5EA] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]\" hx-get=\"/products\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-trigger=\"keyup changed delay:400ms, search\" hx-include=\"[name='category_id'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']\"> <svg class=\"w-5 h-5 text-[#8E8E93] absolute left-3.5 top-3\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z\"></path></svg></div><div class=\"grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-end gap-2 sm:gap-2.5 text-sm w-full lg:w-auto\"><select name=\"category_id\" class=\"w-full sm:w-auto border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]\" hx-get=\"/products\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']\"><option value=\"0\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -311,7 +311,7 @@ func ProductPage(data ProductPageData) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(c.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 311, Col: 39}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 314, Col: 39}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 				if templ_7745c5c3_Err != nil {
@@ -334,7 +334,7 @@ func ProductPage(data ProductPageData) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 311, Col: 88}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 314, Col: 88}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -345,7 +345,7 @@ func ProductPage(data ProductPageData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</select> <select name=\"type\" class=\"border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]\" hx-get=\"/products\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='category_id'], [name='stock_filter'], [name='sort'], [name='limit']\"><option value=\"\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</select> <select name=\"type\" class=\"w-full sm:w-auto border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]\" hx-get=\"/products\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='category_id'], [name='stock_filter'], [name='sort'], [name='limit']\"><option value=\"\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -375,7 +375,7 @@ func ProductPage(data ProductPageData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, ">Jasa / Layanan</option></select> <select name=\"stock_filter\" class=\"border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]\" hx-get=\"/products\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='category_id'], [name='type'], [name='sort'], [name='limit']\"><option value=\"\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, ">Jasa / Layanan</option></select> <select name=\"stock_filter\" class=\"col-span-2 sm:col-span-1 w-full sm:w-auto border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]\" hx-get=\"/products\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='category_id'], [name='type'], [name='sort'], [name='limit']\"><option value=\"\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -407,7 +407,7 @@ func ProductPage(data ProductPageData) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(data.LowStockCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 338, Col: 41}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 341, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -448,7 +448,7 @@ func ProductPage(data ProductPageData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, ">HPP Belum Diisi (Rp 0)</option></select> <select name=\"sort\" class=\"border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]\" hx-get=\"/products\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='category_id'], [name='type'], [name='stock_filter'], [name='limit']\"><option value=\"newest\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, ">HPP Belum Diisi (Rp 0)</option></select> <select name=\"sort\" class=\"w-full sm:w-auto border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]\" hx-get=\"/products\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='category_id'], [name='type'], [name='stock_filter'], [name='limit']\"><option value=\"newest\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -518,7 +518,7 @@ func ProductPage(data ProductPageData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, ">Harga Tertinggi</option></select> <select name=\"limit\" title=\"Jumlah Baris\" class=\"border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]\" hx-get=\"/products\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='category_id'], [name='type'], [name='stock_filter'], [name='sort']\"><option value=\"10\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, ">Harga Tertinggi</option></select> <select name=\"limit\" title=\"Jumlah Baris\" class=\"w-full sm:w-auto border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]\" hx-get=\"/products\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='category_id'], [name='type'], [name='stock_filter'], [name='sort']\"><option value=\"10\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -566,7 +566,7 @@ func ProductPage(data ProductPageData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "<div x-show=\"showPrintModal\" x-transition.opacity x-cloak class=\"fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/50 backdrop-blur-xs\" @click.self=\"showPrintModal = false\"><div class=\"bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-md overflow-hidden p-6 space-y-4 my-auto sm:my-8\"><div class=\"flex items-center justify-between pb-3 border-b border-[#E5E5EA]\"><div class=\"flex items-center gap-2\"><div class=\"w-8 h-8 rounded-full bg-[#007AFF]/15 flex items-center justify-center text-[#007AFF]\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z\"></path></svg></div><h3 class=\"font-bold text-[#1D1D1F]\">Cetak Label Harga / Barcode</h3></div><button type=\"button\" @click=\"showPrintModal = false\" class=\"text-[#8E8E93] hover:text-[#1D1D1F] p-1 rounded-lg\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><div class=\"space-y-3\"><div class=\"bg-[#F5F5F7] p-3 rounded-xl border border-[#E5E5EA]\"><p class=\"text-xs text-[#8E8E93]\">Produk:</p><p class=\"text-sm font-bold text-[#1D1D1F]\" x-text=\"printItem.name\"></p><p class=\"text-xs font-mono text-[#8E8E93] mt-0.5\" x-text=\"printItem.sku\"></p></div><div><label class=\"block text-xs font-semibold text-[#8E8E93] mb-1\">Pilih Satuan &amp; Harga</label> <select x-model=\"printUnitId\" class=\"w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-transparent rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-[#007AFF]\"><template x-for=\"u in getUnits(printItem.id)\" :key=\"u.id\"><option :value=\"u.id\" x-text=\"u.unit_name + ' (Rp ' + u.price + ')'\"></option></template></select></div><div class=\"grid grid-cols-2 gap-3\"><div><label class=\"block text-xs font-semibold text-[#8E8E93] mb-1\">Jumlah Kopi Label</label> <input type=\"number\" min=\"1\" max=\"100\" x-model=\"printQty\" class=\"w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-transparent rounded-xl text-sm font-semibold tabular-nums outline-none focus:bg-white focus:border-[#007AFF]\"></div><div><label class=\"block text-xs font-semibold text-[#8E8E93] mb-1\">Format Kertas</label> <select x-model=\"printFormat\" class=\"w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-transparent rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-[#007AFF]\"><option value=\"thermal\">Roll Thermal (50x30mm)</option> <option value=\"a4\">Lembaran A4 (Grid)</option></select></div></div></div><div class=\"flex gap-2 pt-2 border-t border-[#E5E5EA]\"><button type=\"button\" @click=\"showPrintModal = false\" class=\"flex-1 py-2.5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] text-xs font-semibold hover:bg-black/5 transition\">Batal</button> <button type=\"button\" @click=\"submitPrint()\" class=\"flex-1 py-2.5 rounded-xl bg-[#007AFF] hover:bg-[#0066D6] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z\"></path></svg> <span>Preview &amp; Cetak</span></button></div></div></div><div x-show=\"showStockCardModal\" x-transition.opacity x-cloak class=\"fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/40 backdrop-blur-xs\" @click.self=\"showStockCardModal = false\"><div class=\"bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-3xl overflow-hidden p-6 space-y-4 max-h-[90vh] flex flex-col my-auto sm:my-8\"><div class=\"flex items-center justify-between pb-3 border-b border-[#E5E5EA] flex-shrink-0\"><div class=\"flex items-center gap-3 min-w-0\"><div class=\"w-9 h-9 rounded-xl bg-[#007AFF]/10 flex items-center justify-center text-[#007AFF] flex-shrink-0\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z\"></path></svg></div><div class=\"min-w-0\"><h3 class=\"font-bold text-[#1D1D1F] text-base truncate\" x-text=\"stockCardData ? 'Kartu Stok: ' + stockCardData.name : 'Kartu Stok / Riwayat Mutasi'\"></h3><p class=\"text-xs text-[#8E8E93] font-mono mt-0.5\" x-show=\"stockCardData\" x-text=\"stockCardData ? (stockCardData.sku + ' • HPP: Rp ' + stockCardData.average_cost + ' / ' + stockCardData.base_unit) : ''\"></p></div></div><button type=\"button\" @click=\"showStockCardModal = false\" class=\"min-w-[36px] min-h-[36px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 rounded-xl transition\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18 18 6M6 6l12 12\"></path></svg></button></div><div class=\"overflow-y-auto flex-1 space-y-4 pr-1 text-xs\"><template x-if=\"stockCardLoading\"><div class=\"py-12 text-center text-[#8E8E93]\"><svg class=\"w-6 h-6 animate-spin mx-auto text-[#007AFF] mb-2\" fill=\"none\" viewBox=\"0 0 24 24\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\"></circle><path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8v8H4z\"></path></svg> <span>Memuat riwayat mutasi stok...</span></div></template><template x-if=\"stockCardData\"><div class=\"space-y-4\"><div class=\"grid grid-cols-3 gap-3 p-3.5 bg-[#F5F5F7] rounded-xl border border-[#E5E5EA] text-center\"><div><span class=\"text-[#8E8E93] block text-[11px]\">Stok Fisik Saat Ini</span> <span class=\"font-bold text-[#1D1D1F] text-sm tabular-nums\" x-text=\"stockCardData.current_stock + ' ' + stockCardData.base_unit\"></span></div><div><span class=\"text-[#8E8E93] block text-[11px]\">Total Masuk (+)</span> <span class=\"font-bold text-[#34C759] text-sm tabular-nums\" x-text=\"'+' + stockCardData.total_in + ' ' + stockCardData.base_unit\"></span></div><div><span class=\"text-[#8E8E93] block text-[11px]\">Total Keluar (-)</span> <span class=\"font-bold text-[#FF3B30] text-sm tabular-nums\" x-text=\"'-' + stockCardData.total_out + ' ' + stockCardData.base_unit\"></span></div></div><div class=\"flex flex-wrap items-center justify-between gap-2\"><div class=\"flex flex-wrap items-center gap-1.5\"><button type=\"button\" @click=\"stockCardFilter = 'all'\" :class=\"stockCardFilter === 'all' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'\" class=\"px-3 min-h-[34px] rounded-lg font-semibold text-xs transition\">Semua</button> <button type=\"button\" @click=\"stockCardFilter = 'pembelian'\" :class=\"stockCardFilter === 'pembelian' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'\" class=\"px-3 min-h-[34px] rounded-lg font-semibold text-xs transition\">Pembelian Masuk</button> <button type=\"button\" @click=\"stockCardFilter = 'penjualan'\" :class=\"stockCardFilter === 'penjualan' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'\" class=\"px-3 min-h-[34px] rounded-lg font-semibold text-xs transition\">Penjualan POS</button> <button type=\"button\" @click=\"stockCardFilter = 'opname'\" :class=\"stockCardFilter === 'opname' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'\" class=\"px-3 min-h-[34px] rounded-lg font-semibold text-xs transition\">Opname &amp; Stok Awal</button> <button type=\"button\" @click=\"stockCardFilter = 'pemakaian'\" :class=\"stockCardFilter === 'pemakaian' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'\" class=\"px-3 min-h-[34px] rounded-lg font-semibold text-xs transition\">Pemakaian / Rusak</button> <button type=\"button\" @click=\"stockCardFilter = 'retur_batal'\" :class=\"stockCardFilter === 'retur_batal' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'\" class=\"px-3 min-h-[34px] rounded-lg font-semibold text-xs transition\">Retur / Void</button></div><span class=\"text-[11px] text-[#8E8E93] tabular-nums\" x-text=\"filteredStockEntries.length + ' catatan mutasi'\"></span></div><div class=\"border border-[#E5E5EA] rounded-xl overflow-x-auto\"><table class=\"w-full text-left border-collapse\"><thead class=\"bg-[#F5F5F7]/70 border-b border-[#E5E5EA] text-[#8E8E93] font-medium text-xs\"><tr><th class=\"px-4 py-2.5\">Waktu</th><th class=\"px-4 py-2.5\">Jenis Mutasi</th><th class=\"px-4 py-2.5\">Keterangan / Referensi</th><th class=\"px-4 py-2.5 text-right\">Mutasi</th><th class=\"px-4 py-2.5 text-right\">Saldo Akhir</th></tr></thead> <tbody class=\"divide-y divide-[#E5E5EA] text-xs\"><template x-for=\"item in filteredStockEntries\" :key=\"item.id\"><tr class=\"hover:bg-[#F5F5F7]/40 transition\"><td class=\"px-4 py-2.5 text-[#8E8E93] tabular-nums whitespace-nowrap\" x-text=\"item.date_formatted\"></td><td class=\"px-4 py-2.5 whitespace-nowrap\"><span class=\"inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold\" :class=\"{\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'bg-[#34C759]/15 text-[#248A3D]': item.transaction_type === 'pembelian',\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'bg-[#007AFF]/15 text-[#007AFF]': item.transaction_type === 'penjualan',\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'bg-[#FF9500]/15 text-[#B26A00]': item.transaction_type === 'pemakaian',\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'bg-[#5856D6]/15 text-[#5856D6]': item.transaction_type === 'opname',\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'bg-[#FF3B30]/15 text-[#FF3B30]': item.transaction_type === 'retur_batal'\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t}\" x-text=\"item.transaction_type === 'pembelian' ? 'Pembelian' : (item.transaction_type === 'penjualan' ? 'Penjualan' : (item.transaction_type === 'pemakaian' ? 'Pemakaian / Keluar' : (item.transaction_type === 'retur_batal' ? 'Retur / Batal' : ((item.notes && (item.notes.startsWith('Stok awal') || item.notes.startsWith('Saldo awal'))) ? 'Stok Awal' : 'Stok Opname'))))\"></span></td><td class=\"px-4 py-2.5 text-[#1D1D1F]\"><template x-if=\"item.reference_url\"><a :href=\"item.reference_url\" class=\"text-[#007AFF] hover:underline font-medium\" x-text=\"item.notes || '-'\"></a></template><template x-if=\"!item.reference_url\"><span x-text=\"item.notes || '-'\"></span></template></td><td class=\"px-4 py-2.5 text-right font-bold tabular-nums whitespace-nowrap\" :class=\"item.qty_change > 0 ? 'text-[#34C759]' : (item.qty_change < 0 ? 'text-[#FF3B30]' : 'text-[#8E8E93]')\" x-text=\"(item.qty_change > 0 ? '+' : '') + item.qty_change + ' ' + stockCardData.base_unit\"></td><td class=\"px-4 py-2.5 text-right font-bold text-[#1D1D1F] tabular-nums whitespace-nowrap\" x-text=\"item.balance_after + ' ' + stockCardData.base_unit\"></td></tr></template><template x-if=\"filteredStockEntries.length === 0\"><tr><td colspan=\"5\" class=\"px-4 py-8 text-center text-[#8E8E93]\">Belum ada riwayat mutasi stok untuk filter ini.</td></tr></template></tbody></table></div></div></template></div><div class=\"pt-3 border-t border-[#E5E5EA] flex flex-wrap items-center justify-between gap-2 flex-shrink-0\"><div class=\"flex items-center gap-2\" x-show=\"stockCardData && stockCardData.type === 'barang'\"><a :href=\"stockCardData ? ('/stock-adjustments?mode=opname&product_id=' + stockCardData.product_id) : '/stock-adjustments'\" class=\"min-h-[40px] px-3.5 rounded-xl bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 font-semibold text-xs inline-flex items-center gap-1.5 transition\"><span>Stok Opname</span></a> <a :href=\"stockCardData ? ('/stock-adjustments?mode=pemakaian&product_id=' + stockCardData.product_id) : '/stock-adjustments'\" class=\"min-h-[40px] px-3.5 rounded-xl bg-[#FF9500]/15 text-[#B26A00] hover:bg-[#FF9500]/25 font-semibold text-xs inline-flex items-center gap-1.5 transition\"><span>Catat Pemakaian / Rusak</span></a></div><button type=\"button\" @click=\"showStockCardModal = false\" class=\"min-h-[40px] px-5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-semibold text-xs hover:bg-[#F5F5F7] transition ml-auto\">Tutup</button></div></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "<div x-show=\"showPrintModal\" x-transition.opacity x-cloak class=\"fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/50 backdrop-blur-xs\" @click.self=\"showPrintModal = false\"><div class=\"bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-md overflow-hidden p-4 sm:p-6 space-y-4 my-auto sm:my-8\"><div class=\"flex items-center justify-between pb-3 border-b border-[#E5E5EA]\"><div class=\"flex items-center gap-2\"><div class=\"w-8 h-8 rounded-full bg-[#007AFF]/15 flex items-center justify-center text-[#007AFF]\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z\"></path></svg></div><h3 class=\"font-bold text-[#1D1D1F]\">Cetak Label Harga / Barcode</h3></div><button type=\"button\" @click=\"showPrintModal = false\" class=\"text-[#8E8E93] hover:text-[#1D1D1F] p-1 rounded-lg\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18 18 6M6 6l12 12\"></path></svg></button></div><div class=\"space-y-3\"><div class=\"bg-[#F5F5F7] p-3 rounded-xl border border-[#E5E5EA]\"><p class=\"text-xs text-[#8E8E93]\">Produk:</p><p class=\"text-sm font-bold text-[#1D1D1F]\" x-text=\"printItem.name\"></p><p class=\"text-xs font-mono text-[#8E8E93] mt-0.5\" x-text=\"printItem.sku\"></p></div><div><label class=\"block text-xs font-semibold text-[#8E8E93] mb-1\">Pilih Satuan &amp; Harga</label> <select x-model=\"printUnitId\" class=\"w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-transparent rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-[#007AFF]\"><template x-for=\"u in getUnits(printItem.id)\" :key=\"u.id\"><option :value=\"u.id\" x-text=\"u.unit_name + ' (Rp ' + u.price + ')'\"></option></template></select></div><div class=\"grid grid-cols-2 gap-3\"><div><label class=\"block text-xs font-semibold text-[#8E8E93] mb-1\">Jumlah Kopi Label</label> <input type=\"number\" min=\"1\" max=\"100\" x-model=\"printQty\" class=\"w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-transparent rounded-xl text-sm font-semibold tabular-nums outline-none focus:bg-white focus:border-[#007AFF]\"></div><div><label class=\"block text-xs font-semibold text-[#8E8E93] mb-1\">Format Kertas</label> <select x-model=\"printFormat\" class=\"w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-transparent rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-[#007AFF]\"><option value=\"thermal\">Roll Thermal (50x30mm)</option> <option value=\"a4\">Lembaran A4 (Grid)</option></select></div></div></div><div class=\"flex gap-2 pt-2 border-t border-[#E5E5EA]\"><button type=\"button\" @click=\"showPrintModal = false\" class=\"flex-1 py-2.5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] text-xs font-semibold hover:bg-black/5 transition\">Batal</button> <button type=\"button\" @click=\"submitPrint()\" class=\"flex-1 py-2.5 rounded-xl bg-[#007AFF] hover:bg-[#0066D6] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z\"></path></svg> <span>Preview &amp; Cetak</span></button></div></div></div><div x-show=\"showStockCardModal\" x-transition.opacity x-cloak class=\"fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/40 backdrop-blur-xs\" @click.self=\"showStockCardModal = false\"><div class=\"bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-3xl overflow-hidden p-4 sm:p-6 space-y-4 max-h-[90vh] flex flex-col my-auto sm:my-8\"><div class=\"flex items-center justify-between pb-3 border-b border-[#E5E5EA] flex-shrink-0\"><div class=\"flex items-center gap-3 min-w-0\"><div class=\"w-9 h-9 rounded-xl bg-[#007AFF]/10 flex items-center justify-center text-[#007AFF] flex-shrink-0\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z\"></path></svg></div><div class=\"min-w-0\"><h3 class=\"font-bold text-[#1D1D1F] text-base truncate\" x-text=\"stockCardData ? 'Kartu Stok: ' + stockCardData.name : 'Kartu Stok / Riwayat Mutasi'\"></h3><p class=\"text-xs text-[#8E8E93] font-mono mt-0.5\" x-show=\"stockCardData\" x-text=\"stockCardData ? (stockCardData.sku + ' • HPP: Rp ' + stockCardData.average_cost + ' / ' + stockCardData.base_unit) : ''\"></p></div></div><button type=\"button\" @click=\"showStockCardModal = false\" class=\"min-w-[36px] min-h-[36px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 rounded-xl transition\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18 18 6M6 6l12 12\"></path></svg></button></div><div class=\"overflow-y-auto flex-1 space-y-4 pr-1 text-xs\"><template x-if=\"stockCardLoading\"><div class=\"py-12 text-center text-[#8E8E93]\"><svg class=\"w-6 h-6 animate-spin mx-auto text-[#007AFF] mb-2\" fill=\"none\" viewBox=\"0 0 24 24\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\"></circle><path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8v8H4z\"></path></svg> <span>Memuat riwayat mutasi stok...</span></div></template><template x-if=\"stockCardData\"><div class=\"space-y-4\"><div class=\"grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 p-3 sm:p-3.5 bg-[#F5F5F7] rounded-xl border border-[#E5E5EA] text-center\"><div><span class=\"text-[#8E8E93] block text-[11px]\">Stok Fisik Saat Ini</span> <span class=\"font-bold text-[#1D1D1F] text-sm tabular-nums\" x-text=\"stockCardData.current_stock + ' ' + stockCardData.base_unit\"></span></div><div><span class=\"text-[#8E8E93] block text-[11px]\">Total Masuk (+)</span> <span class=\"font-bold text-[#34C759] text-sm tabular-nums\" x-text=\"'+' + stockCardData.total_in + ' ' + stockCardData.base_unit\"></span></div><div><span class=\"text-[#8E8E93] block text-[11px]\">Total Keluar (-)</span> <span class=\"font-bold text-[#FF3B30] text-sm tabular-nums\" x-text=\"'-' + stockCardData.total_out + ' ' + stockCardData.base_unit\"></span></div></div><div class=\"flex flex-wrap items-center justify-between gap-2\"><div class=\"flex flex-wrap items-center gap-1.5\"><button type=\"button\" @click=\"stockCardFilter = 'all'\" :class=\"stockCardFilter === 'all' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'\" class=\"px-3 min-h-[34px] rounded-lg font-semibold text-xs transition\">Semua</button> <button type=\"button\" @click=\"stockCardFilter = 'pembelian'\" :class=\"stockCardFilter === 'pembelian' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'\" class=\"px-3 min-h-[34px] rounded-lg font-semibold text-xs transition\">Pembelian Masuk</button> <button type=\"button\" @click=\"stockCardFilter = 'penjualan'\" :class=\"stockCardFilter === 'penjualan' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'\" class=\"px-3 min-h-[34px] rounded-lg font-semibold text-xs transition\">Penjualan POS</button> <button type=\"button\" @click=\"stockCardFilter = 'opname'\" :class=\"stockCardFilter === 'opname' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'\" class=\"px-3 min-h-[34px] rounded-lg font-semibold text-xs transition\">Opname &amp; Stok Awal</button> <button type=\"button\" @click=\"stockCardFilter = 'pemakaian'\" :class=\"stockCardFilter === 'pemakaian' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'\" class=\"px-3 min-h-[34px] rounded-lg font-semibold text-xs transition\">Pemakaian / Rusak</button> <button type=\"button\" @click=\"stockCardFilter = 'retur_batal'\" :class=\"stockCardFilter === 'retur_batal' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'\" class=\"px-3 min-h-[34px] rounded-lg font-semibold text-xs transition\">Retur / Void</button></div><span class=\"text-[11px] text-[#8E8E93] tabular-nums\" x-text=\"filteredStockEntries.length + ' catatan mutasi'\"></span></div><div class=\"border border-[#E5E5EA] rounded-xl overflow-x-auto\"><table class=\"w-full text-left border-collapse\"><thead class=\"bg-[#F5F5F7]/70 border-b border-[#E5E5EA] text-[#8E8E93] font-medium text-xs\"><tr><th class=\"px-4 py-2.5\">Waktu</th><th class=\"px-4 py-2.5\">Jenis Mutasi</th><th class=\"px-4 py-2.5\">Keterangan / Referensi</th><th class=\"px-4 py-2.5 text-right\">Mutasi</th><th class=\"px-4 py-2.5 text-right\">Saldo Akhir</th></tr></thead> <tbody class=\"divide-y divide-[#E5E5EA] text-xs\"><template x-for=\"item in filteredStockEntries\" :key=\"item.id\"><tr class=\"hover:bg-[#F5F5F7]/40 transition\"><td class=\"px-4 py-2.5 text-[#8E8E93] tabular-nums whitespace-nowrap\" x-text=\"item.date_formatted\"></td><td class=\"px-4 py-2.5 whitespace-nowrap\"><span class=\"inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold\" :class=\"{\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'bg-[#34C759]/15 text-[#248A3D]': item.transaction_type === 'pembelian',\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'bg-[#007AFF]/15 text-[#007AFF]': item.transaction_type === 'penjualan',\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'bg-[#FF9500]/15 text-[#B26A00]': item.transaction_type === 'pemakaian',\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'bg-[#5856D6]/15 text-[#5856D6]': item.transaction_type === 'opname',\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'bg-[#FF3B30]/15 text-[#FF3B30]': item.transaction_type === 'retur_batal'\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t}\" x-text=\"item.transaction_type === 'pembelian' ? 'Pembelian' : (item.transaction_type === 'penjualan' ? 'Penjualan' : (item.transaction_type === 'pemakaian' ? 'Pemakaian / Keluar' : (item.transaction_type === 'retur_batal' ? 'Retur / Batal' : ((item.notes && (item.notes.startsWith('Stok awal') || item.notes.startsWith('Saldo awal'))) ? 'Stok Awal' : 'Stok Opname'))))\"></span></td><td class=\"px-4 py-2.5 text-[#1D1D1F]\"><template x-if=\"item.reference_url\"><a :href=\"item.reference_url\" class=\"text-[#007AFF] hover:underline font-medium\" x-text=\"item.notes || '-'\"></a></template><template x-if=\"!item.reference_url\"><span x-text=\"item.notes || '-'\"></span></template></td><td class=\"px-4 py-2.5 text-right font-bold tabular-nums whitespace-nowrap\" :class=\"item.qty_change > 0 ? 'text-[#34C759]' : (item.qty_change < 0 ? 'text-[#FF3B30]' : 'text-[#8E8E93]')\" x-text=\"(item.qty_change > 0 ? '+' : '') + item.qty_change + ' ' + stockCardData.base_unit\"></td><td class=\"px-4 py-2.5 text-right font-bold text-[#1D1D1F] tabular-nums whitespace-nowrap\" x-text=\"item.balance_after + ' ' + stockCardData.base_unit\"></td></tr></template><template x-if=\"filteredStockEntries.length === 0\"><tr><td colspan=\"5\" class=\"px-4 py-8 text-center text-[#8E8E93]\">Belum ada riwayat mutasi stok untuk filter ini.</td></tr></template></tbody></table></div></div></template></div><div class=\"pt-3 border-t border-[#E5E5EA] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 flex-shrink-0\"><div class=\"flex flex-col sm:flex-row items-stretch sm:items-center gap-2\" x-show=\"stockCardData && stockCardData.type === 'barang'\"><a :href=\"stockCardData ? ('/stock-adjustments?mode=opname&product_id=' + stockCardData.product_id) : '/stock-adjustments'\" class=\"min-h-[40px] px-3.5 rounded-xl bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 font-semibold text-xs inline-flex items-center justify-center gap-1.5 transition text-center\"><span>Stok Opname</span></a> <a :href=\"stockCardData ? ('/stock-adjustments?mode=pemakaian&product_id=' + stockCardData.product_id) : '/stock-adjustments'\" class=\"min-h-[40px] px-3.5 rounded-xl bg-[#FF9500]/15 text-[#B26A00] hover:bg-[#FF9500]/25 font-semibold text-xs inline-flex items-center justify-center gap-1.5 transition text-center\"><span>Catat Pemakaian / Rusak</span></a></div><button type=\"button\" @click=\"showStockCardModal = false\" class=\"min-h-[40px] px-5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-semibold text-xs hover:bg-[#F5F5F7] transition w-full sm:w-auto ml-auto text-center\">Tutup</button></div></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -625,7 +625,7 @@ func CreateProductPage(categories []repo.Category) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(c.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 656, Col: 40}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 659, Col: 40}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 				if templ_7745c5c3_Err != nil {
@@ -638,7 +638,7 @@ func CreateProductPage(categories []repo.Category) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 656, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 659, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -692,7 +692,7 @@ func ProductTable(data ProductPageData) templ.Component {
 			templ_7745c5c3_Var15 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<div id=\"product-table-container\" class=\"bg-white rounded-2xl shadow-xs border border-[#E5E5EA] overflow-hidden mt-4\"><div class=\"overflow-x-auto\"><table class=\"w-full text-left border-collapse\"><thead class=\"bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]\"><tr><th class=\"px-6 py-3.5 font-medium\">Kategori</th><th class=\"px-6 py-3.5 font-medium\">SKU</th><th class=\"px-6 py-3.5 font-medium\">Nama Produk</th><th class=\"px-6 py-3.5 font-medium text-right\">Stok</th><th class=\"px-6 py-3.5 font-medium\">Satuan</th><th class=\"px-6 py-3.5 font-medium text-right\">HPP (Modal)</th><th class=\"px-6 py-3.5 font-medium text-right\">Harga Jual</th><th class=\"px-6 py-3.5 font-medium text-right\">Aksi</th></tr></thead> <tbody class=\"divide-y divide-[#E5E5EA] text-[15px]\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<div id=\"product-table-container\" class=\"bg-white rounded-2xl shadow-xs border border-[#E5E5EA] overflow-hidden mt-4\"><!-- Desktop & Tablet Table View (hidden on small mobile screens) --><div class=\"hidden sm:block overflow-x-auto\"><table class=\"w-full text-left border-collapse\"><thead class=\"bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]\"><tr><th class=\"px-6 py-3.5 font-medium\">Kategori</th><th class=\"px-6 py-3.5 font-medium\">SKU</th><th class=\"px-6 py-3.5 font-medium\">Nama Produk</th><th class=\"px-6 py-3.5 font-medium text-right\">Stok</th><th class=\"px-6 py-3.5 font-medium\">Satuan</th><th class=\"px-6 py-3.5 font-medium text-right\">HPP (Modal)</th><th class=\"px-6 py-3.5 font-medium text-right\">Harga Jual</th><th class=\"px-6 py-3.5 font-medium text-right\">Aksi</th></tr></thead> <tbody class=\"divide-y divide-[#E5E5EA] text-[15px]\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -704,7 +704,7 @@ func ProductTable(data ProductPageData) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(p.CategoryName.String)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 902, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 906, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -717,7 +717,7 @@ func ProductTable(data ProductPageData) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(p.Sku)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 903, Col: 62}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 907, Col: 62}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -730,7 +730,7 @@ func ProductTable(data ProductPageData) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(p.ProductName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 905, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 909, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -743,7 +743,7 @@ func ProductTable(data ProductPageData) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(p.Type)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 906, Col: 118}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 910, Col: 118}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -754,14 +754,14 @@ func ProductTable(data ProductPageData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if p.Type == "barang" && p.CurrentStock <= 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<div class=\"inline-flex flex-col items-end\"><span class=\"inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FF3B30]/15 text-[#FF3B30]\"><svg class=\"w-3.5 h-3.5 flex-shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z\"></path></svg> Habis (0)</span> <span class=\"text-[11px] text-[#8E8E93] mt-0.5 tabular-nums\">Min: ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<div class=\"inline-flex flex-col items-end\"><span class=\"inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FF3B30]/15 text-[#FF3B30]\"><svg class=\"w-3.5 h-3.5 flex-shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z\"></path></svg> Habis (0)</span> <span class=\"text-[11px] text-[#8E8E93] mt-0.5 tabular-nums\">Min: ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(p.MinStock))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 915, Col: 100}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 919, Col: 100}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -772,14 +772,14 @@ func ProductTable(data ProductPageData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			} else if p.Type == "barang" && p.CurrentStock <= p.MinStock {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "<div class=\"inline-flex flex-col items-end\"><span class=\"inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FF9500]/15 text-[#FF9500]\"><svg class=\"w-3.5 h-3.5 flex-shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z\"></path></svg> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "<div class=\"inline-flex flex-col items-end\"><span class=\"inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FF9500]/15 text-[#FF9500]\"><svg class=\"w-3.5 h-3.5 flex-shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z\"></path></svg> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(p.CurrentStock))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 921, Col: 39}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 925, Col: 39}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -792,7 +792,7 @@ func ProductTable(data ProductPageData) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(p.MinStock))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 923, Col: 100}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 927, Col: 100}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -810,7 +810,7 @@ func ProductTable(data ProductPageData) templ.Component {
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(p.CurrentStock))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 927, Col: 94}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 931, Col: 94}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 				if templ_7745c5c3_Err != nil {
@@ -823,7 +823,7 @@ func ProductTable(data ProductPageData) templ.Component {
 				var templ_7745c5c3_Var24 string
 				templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(p.MinStock))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 928, Col: 106}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 932, Col: 106}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 				if templ_7745c5c3_Err != nil {
@@ -846,7 +846,7 @@ func ProductTable(data ProductPageData) templ.Component {
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(p.UnitName.String)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 934, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 938, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
@@ -865,13 +865,13 @@ func ProductTable(data ProductPageData) templ.Component {
 					var templ_7745c5c3_Var26 templ.SafeURL
 					templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/products/%d/edit", p.ProductID)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 939, Col: 78}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 943, Col: 78}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "\" class=\"inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#FF9500]/15 text-[#B26A00] hover:bg-[#FF9500]/25 transition\" title=\"HPP belum diisi. Klik untuk mengisi atau akan otomatis terisi saat penerimaan barang.\"><svg class=\"w-3.5 h-3.5 flex-shrink-0 text-[#FF9500]\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z\"></path></svg> <span>Belum Diisi</span></a>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "\" class=\"inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#FF9500]/15 text-[#B26A00] hover:bg-[#FF9500]/25 transition\" title=\"HPP belum diisi. Klik untuk mengisi atau akan otomatis terisi saat penerimaan barang.\"><svg class=\"w-3.5 h-3.5 flex-shrink-0 text-[#FF9500]\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z\"></path></svg> <span>Belum Diisi</span></a>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -883,7 +883,7 @@ func ProductTable(data ProductPageData) templ.Component {
 					var templ_7745c5c3_Var27 string
 					templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(utils.FormatRupiah(p.AverageCost))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 948, Col: 103}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 952, Col: 103}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 					if templ_7745c5c3_Err != nil {
@@ -901,7 +901,7 @@ func ProductTable(data ProductPageData) templ.Component {
 					var templ_7745c5c3_Var28 string
 					templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(utils.FormatRupiah(p.AverageCost))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 952, Col: 102}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 956, Col: 102}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 					if templ_7745c5c3_Err != nil {
@@ -925,7 +925,7 @@ func ProductTable(data ProductPageData) templ.Component {
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(utils.FormatRupiah(p.Price))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 958, Col: 134}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 962, Col: 134}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
@@ -943,7 +943,7 @@ func ProductTable(data ProductPageData) templ.Component {
 				var templ_7745c5c3_Var30 string
 				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("openStockCardModal(%d)", p.ProductID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 964, Col: 70}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 968, Col: 70}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 				if templ_7745c5c3_Err != nil {
@@ -961,7 +961,7 @@ func ProductTable(data ProductPageData) templ.Component {
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(p.ProductID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 975, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 979, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 			if templ_7745c5c3_Err != nil {
@@ -974,7 +974,7 @@ func ProductTable(data ProductPageData) templ.Component {
 			var templ_7745c5c3_Var32 string
 			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.ResolveAttributeValue(p.ProductName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 976, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 980, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 			if templ_7745c5c3_Err != nil {
@@ -987,26 +987,26 @@ func ProductTable(data ProductPageData) templ.Component {
 			var templ_7745c5c3_Var33 string
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.ResolveAttributeValue(p.Sku)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 977, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 981, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var33)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "\" @click=\"openPrintModal(parseInt($el.dataset.id), $el.dataset.name, $el.dataset.sku)\" class=\"inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#34C759]/10 text-[#34C759] hover:bg-[#34C759]/20 rounded-xl transition\" title=\"Cetak Label Harga / Barcode\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.5\" d=\"M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z\"></path></svg></button> <a href=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "\" @click=\"openPrintModal(parseInt($el.dataset.id), $el.dataset.name, $el.dataset.sku)\" class=\"inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#34C759]/10 text-[#34C759] hover:bg-[#34C759]/20 rounded-xl transition\" title=\"Cetak Label Harga / Barcode\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z\"></path></svg></button> <a href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var34 templ.SafeURL
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/products/%d/edit", p.ProductID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 985, Col: 77}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 989, Col: 77}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, "\" class=\"inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 rounded-xl transition\" title=\"Ubah Produk\"><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\" class=\"size-5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10\"></path></svg></a></div></td></tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, "\" class=\"inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 rounded-xl transition\" title=\"Ubah Produk\"><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\" class=\"w-5 h-5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10\"></path></svg></a></div></td></tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1017,102 +1017,430 @@ func ProductTable(data ProductPageData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 99, "</tbody></table></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 99, "</tbody></table></div><!-- Mobile Card List View (visible on small mobile screens) --><div class=\"sm:hidden divide-y divide-[#E5E5EA]\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if data.TotalPages > 1 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, "<div class=\"px-6 py-4 border-t border-[#E5E5EA] flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left bg-[#F5F5F7]/50\"><div class=\"text-sm text-[#8E8E93] tabular-nums\">Menampilkan <span class=\"font-medium text-[#1D1D1F]\">")
+		for _, p := range data.Products {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, "<div class=\"p-4 space-y-3 hover:bg-[#F5F5F7]/40 transition\"><div class=\"flex items-start justify-between gap-2.5\"><div class=\"min-w-0 flex-1\"><div class=\"flex items-center gap-1.5 flex-wrap mb-1\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var35 string
-			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint((data.Page-1)*data.Limit + 1))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1010, Col: 104}
+			if p.CategoryName.String != "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 101, "<span class=\"text-[11px] font-medium text-[#8E8E93] bg-[#F5F5F7] px-2 py-0.5 rounded-md border border-[#E5E5EA]\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var35 string
+				templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(p.CategoryName.String)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1021, Col: 33}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, "</span> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 101, "</span> sampai <span class=\"font-medium text-[#1D1D1F]\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "<span class=\"text-[11px] text-[#8E8E93] bg-[#F5F5F7] px-2 py-0.5 rounded-md border border-[#E5E5EA]\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var36 string
-			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(min(data.Page*data.Limit, int(data.TotalRows))))
+			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(p.Type)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1010, Col: 224}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1025, Col: 17}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, "</span> dari <span class=\"font-medium text-[#1D1D1F]\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 104, "</span></div><h4 class=\"font-bold text-[#1D1D1F] text-base leading-snug break-words\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var37 string
-			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(data.TotalRows))
+			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(p.ProductName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1010, Col: 308}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1029, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "</span> data</div><div class=\"flex gap-2\"><button class=\"px-4 min-h-[44px] border border-[#E5E5EA] rounded-xl bg-white text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-50 transition\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if data.Page <= 1 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 104, " disabled")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 105, " hx-get=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 105, "</h4><p class=\"font-mono text-xs text-[#8E8E93] mt-0.5\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var38 string
-			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(templ.SafeURL(fmt.Sprintf("/products?page=%d", data.Page-1))))
+			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(p.Sku)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1016, Col: 83}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1031, Col: 65}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var38)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, "\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='category_id'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']\">Sebelumnya</button> <button class=\"px-4 min-h-[44px] border border-[#E5E5EA] rounded-xl bg-white text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-50 transition\"")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if data.Page >= data.TotalPages {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 107, " disabled")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, " hx-get=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, "</p></div><div class=\"text-right flex-shrink-0\"><span class=\"text-base font-bold text-[#34C759] tabular-nums block\">Rp ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var39 string
-			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(templ.SafeURL(fmt.Sprintf("/products?page=%d", data.Page+1))))
+			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(utils.FormatRupiah(p.Price))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1026, Col: 83}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1035, Col: 40}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, "\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='category_id'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']\">Selanjutnya</button></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 107, "</span> <span class=\"text-xs text-[#8E8E93] block\">/ ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var40 string
+			templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(p.UnitName.String)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1037, Col: 71}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "</span></div></div><!-- Stock and HPP Info Row --><div class=\"flex items-center justify-between text-xs bg-[#F5F5F7]/80 rounded-xl p-2.5 gap-2\"><div><span class=\"text-[#8E8E93] block text-[11px]\">Stok:</span> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if p.Type == "barang" && p.CurrentStock <= 0 {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, "<span class=\"inline-flex items-center gap-1 font-bold text-[#FF3B30]\">Habis (0)</span> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else if p.Type == "barang" && p.CurrentStock <= p.MinStock {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, "<span class=\"inline-flex items-center gap-1 font-bold text-[#FF9500]\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var41 string
+				templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(p.CurrentStock))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1051, Col: 37}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 111, " (Menipis)</span> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else if p.Type == "barang" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 112, "<span class=\"font-bold text-[#1D1D1F] tabular-nums\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var42 string
+				templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(p.CurrentStock))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1055, Col: 37}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 113, " ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var43 string
+				templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(p.UnitName.String)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1055, Col: 59}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 114, "</span> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 115, "<span class=\"text-[#8E8E93] italic\">Non-Stok</span> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			if p.Type == "barang" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 116, "<span class=\"text-[10px] text-[#8E8E93] ml-1 tabular-nums\">(Min: ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var44 string
+				templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(p.MinStock))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1061, Col: 97}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 117, ")</span>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 118, "</div><div class=\"text-right\"><span class=\"text-[#8E8E93] block text-[11px]\">HPP (Modal):</span> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if p.Type == "barang" {
+				if utils.NumericToFloat(p.AverageCost) <= 0 {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 119, "<a href=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var45 templ.SafeURL
+					templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/products/%d/edit", p.ProductID)))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1069, Col: 77}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 120, "\" class=\"text-[#FF9500] font-semibold text-[11px] underline\">Belum Diisi</a>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else if utils.NumericToFloat(p.Price) > 0 && utils.NumericToFloat(p.AverageCost) > utils.NumericToFloat(p.Price) {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 121, "<span class=\"font-medium text-[#FF3B30] tabular-nums\">Rp ")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var46 string
+					templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(utils.FormatRupiah(p.AverageCost))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1075, Col: 101}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 122, "</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 123, "<span class=\"font-medium text-[#1D1D1F] tabular-nums\">Rp ")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var47 string
+					templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(utils.FormatRupiah(p.AverageCost))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1077, Col: 101}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 124, "</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+			} else {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 125, "<span class=\"text-[#8E8E93] italic\">-</span>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 126, "</div></div><!-- Mobile Action Buttons --><div class=\"flex items-center gap-2 pt-1\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if p.Type == "barang" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 127, "<button type=\"button\" @click=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var48 string
+				templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("openStockCardModal(%d)", p.ProductID))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1090, Col: 67}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var48)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 128, "\" class=\"flex-1 min-h-[40px] inline-flex items-center justify-center gap-1.5 bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA] rounded-xl text-xs font-semibold transition\" title=\"Kartu Stok / Riwayat Mutasi\"><svg class=\"w-4 h-4 text-[#8E8E93]\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z\"></path></svg> <span>Kartu Stok</span></button> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 129, "<button type=\"button\" data-id=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var49 string
+			templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(p.ProductID))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1102, Col: 40}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var49)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 130, "\" data-name=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var50 string
+			templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.ResolveAttributeValue(p.ProductName)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1103, Col: 32}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var50)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 131, "\" data-sku=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var51 string
+			templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.ResolveAttributeValue(p.Sku)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1104, Col: 23}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var51)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 132, "\" @click=\"openPrintModal(parseInt($el.dataset.id), $el.dataset.name, $el.dataset.sku)\" class=\"flex-1 min-h-[40px] inline-flex items-center justify-center gap-1.5 bg-[#34C759]/10 text-[#34C759] hover:bg-[#34C759]/20 rounded-xl text-xs font-semibold transition\" title=\"Cetak Label Harga / Barcode\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z\"></path></svg> <span>Label</span></button> <a href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var52 templ.SafeURL
+			templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/products/%d/edit", p.ProductID)))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1115, Col: 74}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 133, "\" class=\"flex-1 min-h-[40px] inline-flex items-center justify-center gap-1.5 bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 rounded-xl text-xs font-semibold transition\" title=\"Ubah Produk\"><svg class=\"w-4 h-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10\"></path></svg> <span>Ubah</span></a></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, "</div>")
+		if len(data.Products) == 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 134, "<div class=\"p-8 text-center text-[#8E8E93]\">Tidak ada produk yang ditemukan.</div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 135, "</div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if data.TotalPages > 1 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 136, "<div class=\"px-4 sm:px-6 py-4 border-t border-[#E5E5EA] flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left bg-[#F5F5F7]/50\"><div class=\"text-xs sm:text-sm text-[#8E8E93] tabular-nums\">Menampilkan <span class=\"font-medium text-[#1D1D1F]\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var53 string
+			templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint((data.Page-1)*data.Limit + 1))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1137, Col: 104}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 137, "</span> sampai <span class=\"font-medium text-[#1D1D1F]\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var54 string
+			templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(min(data.Page*data.Limit, int(data.TotalRows))))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1137, Col: 224}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 138, "</span> dari <span class=\"font-medium text-[#1D1D1F]\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var55 string
+			templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(data.TotalRows))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1137, Col: 308}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 139, "</span> data</div><div class=\"flex gap-2 w-full sm:w-auto justify-center\"><button class=\"flex-1 sm:flex-initial px-4 min-h-[44px] border border-[#E5E5EA] rounded-xl bg-white text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-50 transition\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if data.Page <= 1 {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 140, " disabled")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 141, " hx-get=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var56 string
+			templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(templ.SafeURL(fmt.Sprintf("/products?page=%d", data.Page-1))))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1143, Col: 83}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var56)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 142, "\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='category_id'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']\">Sebelumnya</button> <button class=\"flex-1 sm:flex-initial px-4 min-h-[44px] border border-[#E5E5EA] rounded-xl bg-white text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-50 transition\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if data.Page >= data.TotalPages {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 143, " disabled")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 144, " hx-get=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var57 string
+			templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(templ.SafeURL(fmt.Sprintf("/products?page=%d", data.Page+1))))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1153, Col: 83}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var57)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 145, "\" hx-target=\"#product-table-container\" hx-swap=\"outerHTML\" hx-include=\"[name='q'], [name='category_id'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']\">Selanjutnya</button></div></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 146, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1161,12 +1489,12 @@ func EditProductPage(product repo.Product, units []repo.ProductUnit, categories 
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var40 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var40 == nil {
-			templ_7745c5c3_Var40 = templ.NopComponent
+		templ_7745c5c3_Var58 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var58 == nil {
+			templ_7745c5c3_Var58 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var41 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var59 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -1178,127 +1506,127 @@ func EditProductPage(product repo.Product, units []repo.ProductUnit, categories 
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 111, "<div class=\"max-w-3xl mx-auto px-4 sm:px-6 py-8\"><div class=\"bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8\"><div class=\"flex items-center gap-3 mb-6\"><a href=\"/products\" class=\"min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition\"><svg class=\"w-6 h-6\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M10 19l-7-7m0 0l7-7m-7 7h18\"></path></svg></a><div><h2 class=\"text-2xl font-bold text-[#1D1D1F] tracking-tight\">Ubah Produk</h2><p class=\"text-sm text-[#8E8E93]\">Perbarui data produk, barcode, dan konfigurasi satuan</p></div></div><form hx-post=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 147, "<div class=\"max-w-3xl mx-auto px-4 sm:px-6 py-8\"><div class=\"bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8\"><div class=\"flex items-center gap-3 mb-6\"><a href=\"/products\" class=\"min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition\"><svg class=\"w-6 h-6\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M10 19l-7-7m0 0l7-7m-7 7h18\"></path></svg></a><div><h2 class=\"text-2xl font-bold text-[#1D1D1F] tracking-tight\">Ubah Produk</h2><p class=\"text-sm text-[#8E8E93]\">Perbarui data produk, barcode, dan konfigurasi satuan</p></div></div><form hx-post=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var42 string
-			templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(templ.SafeURL(fmt.Sprintf("/products/%d/edit", product.ID))))
+			var templ_7745c5c3_Var60 string
+			templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(templ.SafeURL(fmt.Sprintf("/products/%d/edit", product.ID))))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1077, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1204, Col: 87}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var42)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var60)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 112, "\" class=\"space-y-5\"><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Kategori Barang</label> <select name=\"category_id\" class=\"w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" required><option value=\"\" disabled>-- Pilih Kategori --</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 148, "\" class=\"space-y-5\"><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Kategori Barang</label> <select name=\"category_id\" class=\"w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" required><option value=\"\" disabled>-- Pilih Kategori --</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, c := range categories {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 113, "<option value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 149, "<option value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var43 string
-				templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(c.ID))
+				var templ_7745c5c3_Var61 string
+				templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(c.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1083, Col: 40}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1210, Col: 40}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var43)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var61)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 114, "\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 150, "\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if c.ID == product.CategoryID {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 115, " selected")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 151, " selected")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 116, ">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 152, ">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var44 string
-				templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
+				var templ_7745c5c3_Var62 string
+				templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1083, Col: 92}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1210, Col: 92}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 117, "</option>")
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 153, "</option>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 118, "</select></div><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Nama Produk / Jasa</label> <input type=\"text\" name=\"name\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 154, "</select></div><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Nama Produk / Jasa</label> <input type=\"text\" name=\"name\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var45 string
-			templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.ResolveAttributeValue(product.Name)
+			var templ_7745c5c3_Var63 string
+			templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.ResolveAttributeValue(product.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1089, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1216, Col: 57}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var45)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 119, "\" class=\"w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] capitalize focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" required></div><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">SKU / Barcode</label> <input class=\"w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" type=\"text\" name=\"sku\" value=\"")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var63)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var46 string
-			templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.ResolveAttributeValue(product.Sku)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1097, Col: 26}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var46)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 155, "\" class=\"w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] capitalize focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" required></div><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">SKU / Barcode</label> <input class=\"w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" type=\"text\" name=\"sku\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 120, "\" required><p class=\"text-xs text-[#8E8E93] mt-1.5\">Ubah hanya jika pabrik mengganti nomor barcode, atau jika ada salah scan.</p></div><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-4\"><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Tipe Barang</label> <select name=\"type\" class=\"w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\"><option value=\"barang\"")
+			var templ_7745c5c3_Var64 string
+			templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.ResolveAttributeValue(product.Sku)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1224, Col: 26}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var64)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 156, "\" required><p class=\"text-xs text-[#8E8E93] mt-1.5\">Ubah hanya jika pabrik mengganti nomor barcode, atau jika ada salah scan.</p></div><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-4\"><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Tipe Barang</label> <select name=\"type\" class=\"w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\"><option value=\"barang\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if product.Type == "barang" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 121, " selected")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 157, " selected")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 122, ">Barang Fisik (Lacak Stok)</option> <option value=\"jasa\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 158, ">Barang Fisik (Lacak Stok)</option> <option value=\"jasa\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if product.Type == "jasa" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 123, " selected")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 159, " selected")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 124, ">Jasa / Layanan (Tanpa Stok)</option></select></div><div class=\"flex items-center sm:pt-6\"><label class=\"inline-flex items-center gap-2.5 cursor-pointer min-h-[44px]\"><input type=\"checkbox\" name=\"is_open_price\" class=\"form-checkbox h-5 w-5 text-[#007AFF] rounded border-[#E5E5EA] focus:ring-[#007AFF]\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 160, ">Jasa / Layanan (Tanpa Stok)</option></select></div><div class=\"flex items-center sm:pt-6\"><label class=\"inline-flex items-center gap-2.5 cursor-pointer min-h-[44px]\"><input type=\"checkbox\" name=\"is_open_price\" class=\"form-checkbox h-5 w-5 text-[#007AFF] rounded border-[#E5E5EA] focus:ring-[#007AFF]\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if product.IsOpenPrice {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 125, " checked")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 161, " checked")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 126, "> <span class=\"text-sm font-medium text-[#1D1D1F]\">Harga Fleksibel (Nego)</span></label></div></div><div x-data=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 162, "> <span class=\"text-sm font-medium text-[#1D1D1F]\">Harga Fleksibel (Nego)</span></label></div></div><div x-data=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var47 string
-			templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf(`{
+			var templ_7745c5c3_Var65 string
+			templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf(`{
 						units: %s,
 						totalConvToBase(idx) {
 							let total = 1;
@@ -1315,58 +1643,58 @@ func EditProductPage(product repo.Product, units []repo.ProductUnit, categories 
 						}
 					}`, getCascadingUnitsJSON(units)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1133, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1260, Col: 38}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var47)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var65)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 127, "\" class=\"space-y-4 border-t border-[#E5E5EA] pt-6 mt-6\"><div class=\"flex flex-col sm:flex-row sm:items-center justify-between gap-2\"><div><h3 class=\"font-bold text-[#1D1D1F]\">Manajemen Satuan &amp; Harga (Terbesar ke Terkecil)</h3><p class=\"text-xs text-[#8E8E93] mt-0.5\">Urutkan dari kemasan paling besar ke paling kecil. Baris paling bawah otomatis menjadi satuan terkecil (Dasar = 1).</p></div><button type=\"button\" @click=\"units.unshift({ unit_name: '', step_qty: 1, price: '' })\" class=\"self-start sm:self-auto border border-[#007AFF] text-[#007AFF] hover:bg-[#007AFF]/10 transition rounded-xl px-3 py-1.5 min-h-[38px] font-semibold text-xs flex items-center gap-1.5 shadow-2xs\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 6v6m0 0v6m0-6h6m-6 0H6\"></path></svg> <span>Tambah Satuan Lebih Besar (Di Atas)</span></button></div><template x-for=\"(unit, index) in units\" :key=\"index\"><div class=\"p-4 rounded-2xl border transition-all space-y-3\" :class=\"index === units.length - 1 ? 'bg-[#007AFF]/5 border-[#007AFF]/30' : 'bg-[#F5F5F7] border-[#E5E5EA]'\"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-2\"><span class=\"text-xs font-semibold px-2.5 py-1 rounded-md\" :class=\"index === units.length - 1 ? 'bg-[#007AFF] text-white' : 'bg-white text-[#1D1D1F] border border-[#E5E5EA]'\" x-text=\"units.length === 1 ? 'Satuan Dasar (Konversi = 1)' : (index === 0 ? '1. Satuan Terbesar' : (index === units.length - 1 ? (index + 1) + '. Satuan Terkecil (Dasar = 1)' : (index + 1) + '. Satuan Turunan'))\"></span> <span x-show=\"index < units.length - 1\" class=\"text-xs font-medium text-[#007AFF] bg-[#007AFF]/10 px-2 py-0.5 rounded-md\" x-text=\"'1 ' + (unit.unit_name || '...') + ' = ' + totalConvToBase(index) + ' ' + smallestUnitName()\"></span></div><button type=\"button\" x-show=\"units.length > 1\" @click=\"units.splice(index, 1)\" class=\"text-[#FF3B30] hover:bg-[#FF3B30]/10 px-2.5 py-1 min-h-[36px] rounded-lg transition text-xs font-medium flex items-center gap-1\" title=\"Hapus Satuan\"><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\" class=\"size-4\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0\"></path></svg> <span>Hapus</span></button></div><div class=\"grid grid-cols-12 gap-3 items-end\"><div :class=\"index === 0 ? 'col-span-12 sm:col-span-6' : 'col-span-12 sm:col-span-4'\"><label class=\"block text-xs font-medium text-[#8E8E93] mb-1\">Nama Satuan</label> <input type=\"text\" name=\"unit_names[]\" x-model=\"unit.unit_name\" class=\"w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] capitalize focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" maxlength=\"15\" required></div><template x-if=\"index === 0\"><input type=\"hidden\" name=\"step_qtys[]\" value=\"1\"></template><template x-if=\"index > 0\"><div class=\"col-span-12 sm:col-span-4\"><label class=\"block text-xs font-medium text-[#8E8E93] mb-1 truncate\" x-text=\"'1 ' + (units[index-1].unit_name || 'Satuan Atas') + ' isi berapa ' + (unit.unit_name || 'ini') + '?'\"></label> <input type=\"number\" min=\"1\" name=\"step_qtys[]\" x-model=\"unit.step_qty\" class=\"w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" required></div></template><div :class=\"index === 0 ? 'col-span-12 sm:col-span-6' : 'col-span-12 sm:col-span-4'\"><label class=\"block text-xs font-medium text-[#8E8E93] mb-1\" x-text=\"'Harga Jual per ' + (unit.unit_name || 'Satuan')\"></label> <input type=\"number\" name=\"prices[]\" x-model=\"unit.price\" class=\"w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" required></div></div></div></template><button type=\"button\" @click=\"units.push({unit_name: '', step_qty: 1, price: ''})\" class=\"w-full border-2 border-dashed border-[#E5E5EA] text-[#8E8E93] hover:border-[#007AFF] hover:text-[#007AFF] hover:bg-[#007AFF]/5 transition rounded-2xl py-3.5 min-h-[48px] font-medium flex items-center justify-center gap-2 text-sm\"><svg width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 6v6m0 0v6m0-6h6m-6 0H6\"></path></svg> <span>Tambah Satuan Lebih Kecil / Eceran (Di Bawahnya)</span></button><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[#E5E5EA] pt-6\"><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Harga Modal / HPP <span class=\"text-xs font-normal text-[#8E8E93]\">(Opsional)</span></label> <input type=\"number\" name=\"average_cost\" min=\"0\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 163, "\" class=\"space-y-4 border-t border-[#E5E5EA] pt-6 mt-6\"><div class=\"flex flex-col sm:flex-row sm:items-center justify-between gap-2\"><div><h3 class=\"font-bold text-[#1D1D1F]\">Manajemen Satuan &amp; Harga (Terbesar ke Terkecil)</h3><p class=\"text-xs text-[#8E8E93] mt-0.5\">Urutkan dari kemasan paling besar ke paling kecil. Baris paling bawah otomatis menjadi satuan terkecil (Dasar = 1).</p></div><button type=\"button\" @click=\"units.unshift({ unit_name: '', step_qty: 1, price: '' })\" class=\"self-start sm:self-auto border border-[#007AFF] text-[#007AFF] hover:bg-[#007AFF]/10 transition rounded-xl px-3 py-1.5 min-h-[38px] font-semibold text-xs flex items-center gap-1.5 shadow-2xs\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 6v6m0 0v6m0-6h6m-6 0H6\"></path></svg> <span>Tambah Satuan Lebih Besar (Di Atas)</span></button></div><template x-for=\"(unit, index) in units\" :key=\"index\"><div class=\"p-4 rounded-2xl border transition-all space-y-3\" :class=\"index === units.length - 1 ? 'bg-[#007AFF]/5 border-[#007AFF]/30' : 'bg-[#F5F5F7] border-[#E5E5EA]'\"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-2\"><span class=\"text-xs font-semibold px-2.5 py-1 rounded-md\" :class=\"index === units.length - 1 ? 'bg-[#007AFF] text-white' : 'bg-white text-[#1D1D1F] border border-[#E5E5EA]'\" x-text=\"units.length === 1 ? 'Satuan Dasar (Konversi = 1)' : (index === 0 ? '1. Satuan Terbesar' : (index === units.length - 1 ? (index + 1) + '. Satuan Terkecil (Dasar = 1)' : (index + 1) + '. Satuan Turunan'))\"></span> <span x-show=\"index < units.length - 1\" class=\"text-xs font-medium text-[#007AFF] bg-[#007AFF]/10 px-2 py-0.5 rounded-md\" x-text=\"'1 ' + (unit.unit_name || '...') + ' = ' + totalConvToBase(index) + ' ' + smallestUnitName()\"></span></div><button type=\"button\" x-show=\"units.length > 1\" @click=\"units.splice(index, 1)\" class=\"text-[#FF3B30] hover:bg-[#FF3B30]/10 px-2.5 py-1 min-h-[36px] rounded-lg transition text-xs font-medium flex items-center gap-1\" title=\"Hapus Satuan\"><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\" class=\"size-4\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0\"></path></svg> <span>Hapus</span></button></div><div class=\"grid grid-cols-12 gap-3 items-end\"><div :class=\"index === 0 ? 'col-span-12 sm:col-span-6' : 'col-span-12 sm:col-span-4'\"><label class=\"block text-xs font-medium text-[#8E8E93] mb-1\">Nama Satuan</label> <input type=\"text\" name=\"unit_names[]\" x-model=\"unit.unit_name\" class=\"w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] capitalize focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" maxlength=\"15\" required></div><template x-if=\"index === 0\"><input type=\"hidden\" name=\"step_qtys[]\" value=\"1\"></template><template x-if=\"index > 0\"><div class=\"col-span-12 sm:col-span-4\"><label class=\"block text-xs font-medium text-[#8E8E93] mb-1 truncate\" x-text=\"'1 ' + (units[index-1].unit_name || 'Satuan Atas') + ' isi berapa ' + (unit.unit_name || 'ini') + '?'\"></label> <input type=\"number\" min=\"1\" name=\"step_qtys[]\" x-model=\"unit.step_qty\" class=\"w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" required></div></template><div :class=\"index === 0 ? 'col-span-12 sm:col-span-6' : 'col-span-12 sm:col-span-4'\"><label class=\"block text-xs font-medium text-[#8E8E93] mb-1\" x-text=\"'Harga Jual per ' + (unit.unit_name || 'Satuan')\"></label> <input type=\"number\" name=\"prices[]\" x-model=\"unit.price\" class=\"w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" required></div></div></div></template><button type=\"button\" @click=\"units.push({unit_name: '', step_qty: 1, price: ''})\" class=\"w-full border-2 border-dashed border-[#E5E5EA] text-[#8E8E93] hover:border-[#007AFF] hover:text-[#007AFF] hover:bg-[#007AFF]/5 transition rounded-2xl py-3.5 min-h-[48px] font-medium flex items-center justify-center gap-2 text-sm\"><svg width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 6v6m0 0v6m0-6h6m-6 0H6\"></path></svg> <span>Tambah Satuan Lebih Kecil / Eceran (Di Bawahnya)</span></button><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[#E5E5EA] pt-6\"><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Harga Modal / HPP <span class=\"text-xs font-normal text-[#8E8E93]\">(Opsional)</span></label> <input type=\"number\" name=\"average_cost\" min=\"0\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var48 string
-			templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.ResolveAttributeValue(utils.FormatPlainFloat(product.AverageCost))
+			var templ_7745c5c3_Var66 string
+			templ_7745c5c3_Var66, templ_7745c5c3_Err = templ.ResolveAttributeValue(utils.FormatPlainFloat(product.AverageCost))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1235, Col: 108}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1362, Col: 108}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var48)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 128, "\" placeholder=\"Kosongkan / 0 jika belum tahu\" class=\"w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\"><p class=\"text-xs text-[#8E8E93] mt-1.5\" x-text=\"'Per ' + smallestUnitName() + ' (otomatis ikut harga beli saat kulakan jika 0)'\"></p></div><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Batas Min. Stok (Alert)</label> <input type=\"number\" name=\"min_stock\" min=\"0\" value=\"")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var66)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var49 string
-			templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(product.MinStock))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1242, Col: 90}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var49)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 164, "\" placeholder=\"Kosongkan / 0 jika belum tahu\" class=\"w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\"><p class=\"text-xs text-[#8E8E93] mt-1.5\" x-text=\"'Per ' + smallestUnitName() + ' (otomatis ikut harga beli saat kulakan jika 0)'\"></p></div><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Batas Min. Stok (Alert)</label> <input type=\"number\" name=\"min_stock\" min=\"0\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 129, "\" class=\"w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" required><p class=\"text-xs text-[#8E8E93] mt-1.5\" x-text=\"'Peringatan jika &le; batas (' + smallestUnitName() + ')'\"></p></div></div></div><div class=\"pt-6 border-t border-[#E5E5EA] flex flex-col sm:flex-row items-center justify-between gap-4\"><button type=\"button\" hx-delete=\"")
+			var templ_7745c5c3_Var67 string
+			templ_7745c5c3_Var67, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(product.MinStock))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1369, Col: 90}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var67)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var50 string
-			templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/products/%d", product.ID))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1250, Col: 58}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var50)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 165, "\" class=\"w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition\" required><p class=\"text-xs text-[#8E8E93] mt-1.5\" x-text=\"'Peringatan jika &le; batas (' + smallestUnitName() + ')'\"></p></div></div></div><div class=\"pt-6 border-t border-[#E5E5EA] flex flex-col sm:flex-row items-center justify-between gap-4\"><button type=\"button\" hx-delete=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 130, "\" hx-confirm=\"Yakin ingin menghapus produk ini? Produk yang sudah memiliki riwayat transaksi akan dinonaktifkan.\" class=\"w-full sm:w-auto px-4 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF3B30]/10 text-[#FF3B30] hover:bg-[#FF3B30]/20 font-semibold text-sm transition\"><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\" class=\"size-5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0\"></path></svg> <span>Hapus Produk</span></button><div class=\"flex items-center justify-end gap-3 w-full sm:w-auto\"><a href=\"/products\" class=\"w-full sm:w-auto px-5 min-h-[44px] inline-flex items-center justify-center rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-medium hover:bg-[#F5F5F7] transition text-sm\">Batal</a> <button type=\"submit\" class=\"w-full sm:w-auto bg-[#007AFF] hover:bg-[#0066D6] text-white px-6 min-h-[44px] rounded-xl font-semibold text-sm transition shadow-xs\">Simpan Perubahan</button></div></div></form></div></div>")
+			var templ_7745c5c3_Var68 string
+			templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/products/%d", product.ID))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1377, Col: 58}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var68)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 166, "\" hx-confirm=\"Yakin ingin menghapus produk ini? Produk yang sudah memiliki riwayat transaksi akan dinonaktifkan.\" class=\"w-full sm:w-auto px-4 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF3B30]/10 text-[#FF3B30] hover:bg-[#FF3B30]/20 font-semibold text-sm transition\"><svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\" class=\"size-5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0\"></path></svg> <span>Hapus Produk</span></button><div class=\"flex items-center justify-end gap-3 w-full sm:w-auto\"><a href=\"/products\" class=\"w-full sm:w-auto px-5 min-h-[44px] inline-flex items-center justify-center rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-medium hover:bg-[#F5F5F7] transition text-sm\">Batal</a> <button type=\"submit\" class=\"w-full sm:w-auto bg-[#007AFF] hover:bg-[#0066D6] text-white px-6 min-h-[44px] rounded-xl font-semibold text-sm transition shadow-xs\">Simpan Perubahan</button></div></div></form></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = views.Base("Ubah Produk", "products").Render(templ.WithChildren(ctx, templ_7745c5c3_Var41), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = views.Base("Ubah Produk", "products").Render(templ.WithChildren(ctx, templ_7745c5c3_Var59), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1419,12 +1747,12 @@ func PrintLabelsPage(products []repo.ListPOSProductsRow, units []repo.ListPOSPro
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var51 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var51 == nil {
-			templ_7745c5c3_Var51 = templ.NopComponent
+		templ_7745c5c3_Var69 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var69 == nil {
+			templ_7745c5c3_Var69 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var52 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var70 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -1436,12 +1764,12 @@ func PrintLabelsPage(products []repo.ListPOSProductsRow, units []repo.ListPOSPro
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 131, "<div class=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8\" x-data=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 167, "<div class=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8\" x-data=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var53 string
-			templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf(`{
+			var templ_7745c5c3_Var71 string
+			templ_7745c5c3_Var71, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf(`{
 				products: %s,
 				units: %s,
 				preselectedID: %d,
@@ -1568,19 +1896,19 @@ func PrintLabelsPage(products []repo.ListPOSProductsRow, units []repo.ListPOSPro
 				}
 			}`, serializePrintProductsJSON(products), serializeProductUnitsJSON(units), preselectedID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1435, Col: 93}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1562, Col: 93}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var53)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var71)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 132, "\"><div class=\"mb-6\"><h1 class=\"text-3xl font-bold text-[#1D1D1F] tracking-tight\">Cetak Label Harga &amp; Barcode Rak</h1><p class=\"text-sm text-[#8E8E93] mt-1\">Pilih produk, satuan, dan jumlah lembar label harga rak toko atau barcode thermal roll</p></div><div class=\"bg-white rounded-2xl border border-[#E5E5EA] p-5 shadow-xs mb-6\"><div class=\"grid grid-cols-1 lg:grid-cols-12 gap-5 items-end\"><div class=\"lg:col-span-8 relative\" @click.away=\"dropdownOpen = false\"><label class=\"block text-xs font-semibold text-[#8E8E93] mb-1.5 uppercase tracking-wider\">Cari &amp; Tambah Produk</label><div class=\"relative\"><div class=\"absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#8E8E93]\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z\"></path></svg></div><input x-ref=\"searchInput\" type=\"text\" x-model=\"searchQuery\" @focus=\"dropdownOpen = true\" @input=\"dropdownOpen = true\" @keydown.enter.prevent=\"onSearchEnter()\" @keydown.escape=\"dropdownOpen = false\" placeholder=\"Ketik nama produk, SKU, atau scan barcode lalu Enter...\" class=\"w-full pl-11 pr-16 min-h-[46px] bg-[#F5F5F7] border border-transparent rounded-xl text-sm text-[#1D1D1F] placeholder-[#8E8E93] outline-none focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition\" autocomplete=\"off\"><div class=\"absolute inset-y-0 right-0 pr-3 flex items-center gap-1.5 text-xs text-[#8E8E93]\"><kbd class=\"px-1.5 py-0.5 bg-white border border-[#E5E5EA] rounded shadow-2xs font-mono text-[10px]\">Enter</kbd></div></div><div x-show=\"dropdownOpen\" x-transition:enter=\"transition ease-out duration-100\" x-transition:enter-start=\"opacity-0 scale-95\" x-transition:enter-end=\"opacity-100 scale-100\" x-transition:leave=\"transition ease-in duration-75\" x-transition:leave-start=\"opacity-100 scale-100\" x-transition:leave-end=\"opacity-0 scale-95\" class=\"absolute z-50 left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-[#E5E5EA] max-h-80 overflow-y-auto divide-y divide-[#F5F5F7]\" style=\"display: none;\"><template x-for=\"p in filteredProducts\" :key=\"p.id\"><button type=\"button\" @click=\"addProduct(p)\" class=\"w-full text-left px-4 py-3 hover:bg-[#F5F5F7] transition flex items-center justify-between gap-3 group\"><div class=\"min-w-0 flex-1\"><div class=\"flex items-center gap-2\"><span class=\"font-semibold text-sm text-[#1D1D1F] group-hover:text-[#007AFF] transition truncate\" x-text=\"p.name\"></span> <span x-show=\"p.category_name\" class=\"px-2 py-0.5 bg-[#F5F5F7] group-hover:bg-white text-[11px] font-medium text-[#8E8E93] rounded-md shrink-0\" x-text=\"p.category_name\"></span></div><div class=\"flex items-center gap-3 mt-0.5 text-xs text-[#8E8E93]\"><span class=\"font-mono\" x-text=\"'SKU: ' + p.sku\"></span> <span>•</span> <span x-text=\"'Stok: ' + p.current_stock\"></span></div></div><span class=\"shrink-0 text-xs font-semibold text-[#007AFF] bg-[#007AFF]/10 px-2.5 py-1 rounded-lg group-hover:bg-[#007AFF] group-hover:text-white transition\">+ Tambah</span></button></template><div x-show=\"filteredProducts.length === 0\" class=\"px-4 py-8 text-center text-sm text-[#8E8E93]\">Tidak ada produk yang cocok dengan \"<span x-text=\"searchQuery\" class=\"font-semibold text-[#1D1D1F]\"></span>\"</div></div></div><div class=\"lg:col-span-4\"><label class=\"block text-xs font-semibold text-[#8E8E93] mb-1.5 uppercase tracking-wider\">Ukuran / Format Cetak</label><div class=\"grid grid-cols-2 gap-2 bg-[#F5F5F7] p-1 rounded-xl border border-[#E5E5EA]\"><button type=\"button\" @click=\"format = 'thermal'\" :class=\"format === 'thermal' ? 'bg-white text-[#1D1D1F] shadow-xs font-semibold' : 'text-[#8E8E93] hover:text-[#1D1D1F] font-medium'\" class=\"min-h-[38px] py-1.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5\"><svg class=\"w-4 h-4 shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M7 7h10M7 11h10M7 15h6M4 4h16v16H4z\"></path></svg> <span>Thermal 50x30</span></button> <button type=\"button\" @click=\"format = 'a4'\" :class=\"format === 'a4' ? 'bg-white text-[#1D1D1F] shadow-xs font-semibold' : 'text-[#8E8E93] hover:text-[#1D1D1F] font-medium'\" class=\"min-h-[38px] py-1.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5\"><svg class=\"w-4 h-4 shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z\"></path></svg> <span>A4 Grid (3 Kolom)</span></button></div></div></div></div><div class=\"bg-white rounded-2xl border border-[#E5E5EA] shadow-xs overflow-hidden\"><div class=\"px-6 py-4 border-b border-[#E5E5EA] flex items-center justify-between\"><div><h2 class=\"text-base font-bold text-[#1D1D1F]\">Daftar Produk yang Akan Dicetak</h2><p class=\"text-xs text-[#8E8E93] mt-0.5\" x-text=\"selectedItems.length > 0 ? (selectedItems.length + ' produk dipilih, total ' + totalCopies() + ' lembar label') : 'Pilih produk dari pencarian di atas'\"></p></div><button x-show=\"selectedItems.length > 0\" type=\"button\" @click=\"clearAll()\" class=\"text-xs font-semibold text-[#FF3B30] hover:text-[#D70015] hover:bg-red-50 px-3 min-h-[36px] inline-flex items-center rounded-xl transition\">Kosongkan Antrean</button></div><div class=\"overflow-x-auto\"><table class=\"w-full text-left border-collapse\"><thead class=\"bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]\"><tr><th class=\"px-6 py-3.5 font-medium w-12 text-center\">#</th><th class=\"px-6 py-3.5 font-medium\">Produk</th><th class=\"px-6 py-3.5 font-medium w-64\">Satuan &amp; Harga Rak</th><th class=\"px-6 py-3.5 font-medium w-44 text-center\">Jumlah Lembar</th><th class=\"px-6 py-3.5 font-medium w-32 text-right\">Subtotal</th><th class=\"px-6 py-3.5 font-medium w-16 text-right\">Aksi</th></tr></thead> <tbody class=\"divide-y divide-[#E5E5EA] text-[15px]\"><template x-for=\"(item, index) in selectedItems\" :key=\"item.id\"><tr class=\"hover:bg-[#F5F5F7]/50 transition\"><td class=\"px-6 py-3.5 text-center text-xs font-semibold text-[#8E8E93] tabular-nums\" x-text=\"index + 1\"></td><td class=\"px-6 py-3.5\"><div class=\"font-semibold text-sm text-[#1D1D1F]\" x-text=\"item.name\"></div><div class=\"flex items-center gap-2 mt-1\"><span class=\"inline-block px-2 py-0.5 bg-[#F5F5F7] rounded text-xs font-mono text-[#8E8E93]\" x-text=\"item.sku\"></span> <span x-show=\"item.category_name\" class=\"text-xs text-[#8E8E93]\" x-text=\"'• ' + item.category_name\"></span></div></td><td class=\"px-6 py-3.5\"><select x-model.number=\"item.unit_id\" class=\"w-full bg-[#F5F5F7] border border-transparent focus:border-[#007AFF] focus:bg-white rounded-xl px-3 min-h-[38px] text-xs font-medium text-[#1D1D1F] outline-none transition\"><template x-for=\"u in getProductUnits(item.id)\" :key=\"u.id\"><option :value=\"u.id\" x-text=\"u.unit_name + ' — Rp ' + u.price\"></option></template></select></td><td class=\"px-6 py-3.5\"><div class=\"flex items-center justify-center gap-1.5\"><button type=\"button\" @click=\"if (item.qty > 1) item.qty--\" class=\"w-8 h-8 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] font-bold text-sm flex items-center justify-center transition\">-</button> <input type=\"number\" x-model.number=\"item.qty\" min=\"1\" class=\"w-16 min-h-[34px] text-center text-sm font-bold bg-[#F5F5F7] border border-transparent focus:border-[#007AFF] focus:bg-white rounded-lg outline-none transition tabular-nums\"> <button type=\"button\" @click=\"item.qty++\" class=\"w-8 h-8 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] font-bold text-sm flex items-center justify-center transition\">+</button></div></td><td class=\"px-6 py-3.5 text-right font-bold text-[#007AFF] tabular-nums text-xs\"><span x-text=\"item.qty + ' lembar'\"></span></td><td class=\"px-6 py-3.5 text-right\"><button type=\"button\" @click=\"removeProduct(index)\" class=\"inline-flex items-center justify-center min-w-[36px] min-h-[36px] bg-[#FF3B30]/10 text-[#FF3B30] hover:bg-[#FF3B30]/20 rounded-xl transition\" title=\"Hapus dari antrean\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16\"></path></svg></button></td></tr></template></tbody></table><div x-show=\"selectedItems.length === 0\" class=\"py-16 text-center px-4\"><div class=\"w-14 h-14 mx-auto rounded-2xl bg-[#007AFF]/10 text-[#007AFF] flex items-center justify-center mb-3\"><svg class=\"w-7 h-7\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M7 7h10M7 11h10M7 15h6M4 4h16v16H4z\"></path></svg></div><h3 class=\"text-sm font-bold text-[#1D1D1F]\">Antrean Cetak Masih Kosong</h3><p class=\"text-xs text-[#8E8E93] max-w-sm mx-auto mt-1\">Ketik nama barang atau gunakan barcode scanner pada kolom pencarian di atas untuk memasukkan produk ke daftar cetak.</p></div></div><div class=\"p-4 sm:p-5 border-t border-[#E5E5EA] bg-[#F5F5F7]/40 flex flex-col sm:flex-row items-center justify-between gap-4\"><div class=\"flex flex-wrap items-center gap-4 sm:gap-6 text-sm\"><div><span class=\"text-xs text-[#8E8E93] block\">Jenis Produk</span> <span class=\"font-bold text-[#1D1D1F]\" x-text=\"selectedItems.length + ' produk'\"></span></div><div class=\"h-8 w-px bg-[#E5E5EA] hidden sm:block\"></div><div><span class=\"text-xs text-[#8E8E93] block\">Total Lembar Label</span> <span class=\"font-bold text-[#007AFF] tabular-nums\" x-text=\"totalCopies() + ' label'\"></span></div><div class=\"h-8 w-px bg-[#E5E5EA] hidden sm:block\"></div><div><span class=\"text-xs text-[#8E8E93] block\">Format Cetak</span> <span class=\"font-semibold text-[#1D1D1F]\" x-text=\"format === 'thermal' ? 'Roll Thermal 50x30mm' : 'Lembaran A4 (3 Kolom)'\"></span></div></div><div class=\"flex items-center gap-3 w-full sm:w-auto justify-end\"><a href=\"/products\" class=\"flex-1 sm:flex-none px-5 min-h-[44px] inline-flex items-center justify-center rounded-xl border border-[#E5E5EA] bg-white text-[#1D1D1F] text-sm font-semibold hover:bg-[#F5F5F7] transition shadow-xs\">Batal</a> <button type=\"button\" @click=\"submitForm()\" :disabled=\"selectedItems.length === 0\" class=\"flex-1 sm:flex-none bg-[#007AFF] hover:bg-[#0066D6] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 min-h-[44px] rounded-xl transition shadow-xs flex items-center justify-center gap-2\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z\"></path></svg> <span>Buka Halaman Cetak Label</span></button></div></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 168, "\"><div class=\"mb-6\"><h1 class=\"text-3xl font-bold text-[#1D1D1F] tracking-tight\">Cetak Label Harga &amp; Barcode Rak</h1><p class=\"text-sm text-[#8E8E93] mt-1\">Pilih produk, satuan, dan jumlah lembar label harga rak toko atau barcode thermal roll</p></div><div class=\"bg-white rounded-2xl border border-[#E5E5EA] p-5 shadow-xs mb-6\"><div class=\"grid grid-cols-1 lg:grid-cols-12 gap-5 items-end\"><div class=\"lg:col-span-8 relative\" @click.away=\"dropdownOpen = false\"><label class=\"block text-xs font-semibold text-[#8E8E93] mb-1.5 uppercase tracking-wider\">Cari &amp; Tambah Produk</label><div class=\"relative\"><div class=\"absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#8E8E93]\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z\"></path></svg></div><input x-ref=\"searchInput\" type=\"text\" x-model=\"searchQuery\" @focus=\"dropdownOpen = true\" @input=\"dropdownOpen = true\" @keydown.enter.prevent=\"onSearchEnter()\" @keydown.escape=\"dropdownOpen = false\" placeholder=\"Ketik nama produk, SKU, atau scan barcode lalu Enter...\" class=\"w-full pl-11 pr-16 min-h-[46px] bg-[#F5F5F7] border border-transparent rounded-xl text-sm text-[#1D1D1F] placeholder-[#8E8E93] outline-none focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition\" autocomplete=\"off\"><div class=\"absolute inset-y-0 right-0 pr-3 flex items-center gap-1.5 text-xs text-[#8E8E93]\"><kbd class=\"px-1.5 py-0.5 bg-white border border-[#E5E5EA] rounded shadow-2xs font-mono text-[10px]\">Enter</kbd></div></div><div x-show=\"dropdownOpen\" x-transition:enter=\"transition ease-out duration-100\" x-transition:enter-start=\"opacity-0 scale-95\" x-transition:enter-end=\"opacity-100 scale-100\" x-transition:leave=\"transition ease-in duration-75\" x-transition:leave-start=\"opacity-100 scale-100\" x-transition:leave-end=\"opacity-0 scale-95\" class=\"absolute z-50 left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-[#E5E5EA] max-h-80 overflow-y-auto divide-y divide-[#F5F5F7]\" style=\"display: none;\"><template x-for=\"p in filteredProducts\" :key=\"p.id\"><button type=\"button\" @click=\"addProduct(p)\" class=\"w-full text-left px-4 py-3 hover:bg-[#F5F5F7] transition flex items-center justify-between gap-3 group\"><div class=\"min-w-0 flex-1\"><div class=\"flex items-center gap-2\"><span class=\"font-semibold text-sm text-[#1D1D1F] group-hover:text-[#007AFF] transition truncate\" x-text=\"p.name\"></span> <span x-show=\"p.category_name\" class=\"px-2 py-0.5 bg-[#F5F5F7] group-hover:bg-white text-[11px] font-medium text-[#8E8E93] rounded-md shrink-0\" x-text=\"p.category_name\"></span></div><div class=\"flex items-center gap-3 mt-0.5 text-xs text-[#8E8E93]\"><span class=\"font-mono\" x-text=\"'SKU: ' + p.sku\"></span> <span>•</span> <span x-text=\"'Stok: ' + p.current_stock\"></span></div></div><span class=\"shrink-0 text-xs font-semibold text-[#007AFF] bg-[#007AFF]/10 px-2.5 py-1 rounded-lg group-hover:bg-[#007AFF] group-hover:text-white transition\">+ Tambah</span></button></template><div x-show=\"filteredProducts.length === 0\" class=\"px-4 py-8 text-center text-sm text-[#8E8E93]\">Tidak ada produk yang cocok dengan \"<span x-text=\"searchQuery\" class=\"font-semibold text-[#1D1D1F]\"></span>\"</div></div></div><div class=\"lg:col-span-4\"><label class=\"block text-xs font-semibold text-[#8E8E93] mb-1.5 uppercase tracking-wider\">Ukuran / Format Cetak</label><div class=\"grid grid-cols-2 gap-2 bg-[#F5F5F7] p-1 rounded-xl border border-[#E5E5EA]\"><button type=\"button\" @click=\"format = 'thermal'\" :class=\"format === 'thermal' ? 'bg-white text-[#1D1D1F] shadow-xs font-semibold' : 'text-[#8E8E93] hover:text-[#1D1D1F] font-medium'\" class=\"min-h-[38px] py-1.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5\"><svg class=\"w-4 h-4 shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M7 7h10M7 11h10M7 15h6M4 4h16v16H4z\"></path></svg> <span>Thermal 50x30</span></button> <button type=\"button\" @click=\"format = 'a4'\" :class=\"format === 'a4' ? 'bg-white text-[#1D1D1F] shadow-xs font-semibold' : 'text-[#8E8E93] hover:text-[#1D1D1F] font-medium'\" class=\"min-h-[38px] py-1.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5\"><svg class=\"w-4 h-4 shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z\"></path></svg> <span>A4 Grid (3 Kolom)</span></button></div></div></div></div><div class=\"bg-white rounded-2xl border border-[#E5E5EA] shadow-xs overflow-hidden\"><div class=\"px-6 py-4 border-b border-[#E5E5EA] flex items-center justify-between\"><div><h2 class=\"text-base font-bold text-[#1D1D1F]\">Daftar Produk yang Akan Dicetak</h2><p class=\"text-xs text-[#8E8E93] mt-0.5\" x-text=\"selectedItems.length > 0 ? (selectedItems.length + ' produk dipilih, total ' + totalCopies() + ' lembar label') : 'Pilih produk dari pencarian di atas'\"></p></div><button x-show=\"selectedItems.length > 0\" type=\"button\" @click=\"clearAll()\" class=\"text-xs font-semibold text-[#FF3B30] hover:text-[#D70015] hover:bg-red-50 px-3 min-h-[36px] inline-flex items-center rounded-xl transition\">Kosongkan Antrean</button></div><div class=\"overflow-x-auto\"><table class=\"w-full text-left border-collapse\"><thead class=\"bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]\"><tr><th class=\"px-6 py-3.5 font-medium w-12 text-center\">#</th><th class=\"px-6 py-3.5 font-medium\">Produk</th><th class=\"px-6 py-3.5 font-medium w-64\">Satuan &amp; Harga Rak</th><th class=\"px-6 py-3.5 font-medium w-44 text-center\">Jumlah Lembar</th><th class=\"px-6 py-3.5 font-medium w-32 text-right\">Subtotal</th><th class=\"px-6 py-3.5 font-medium w-16 text-right\">Aksi</th></tr></thead> <tbody class=\"divide-y divide-[#E5E5EA] text-[15px]\"><template x-for=\"(item, index) in selectedItems\" :key=\"item.id\"><tr class=\"hover:bg-[#F5F5F7]/50 transition\"><td class=\"px-6 py-3.5 text-center text-xs font-semibold text-[#8E8E93] tabular-nums\" x-text=\"index + 1\"></td><td class=\"px-6 py-3.5\"><div class=\"font-semibold text-sm text-[#1D1D1F]\" x-text=\"item.name\"></div><div class=\"flex items-center gap-2 mt-1\"><span class=\"inline-block px-2 py-0.5 bg-[#F5F5F7] rounded text-xs font-mono text-[#8E8E93]\" x-text=\"item.sku\"></span> <span x-show=\"item.category_name\" class=\"text-xs text-[#8E8E93]\" x-text=\"'• ' + item.category_name\"></span></div></td><td class=\"px-6 py-3.5\"><select x-model.number=\"item.unit_id\" class=\"w-full bg-[#F5F5F7] border border-transparent focus:border-[#007AFF] focus:bg-white rounded-xl px-3 min-h-[38px] text-xs font-medium text-[#1D1D1F] outline-none transition\"><template x-for=\"u in getProductUnits(item.id)\" :key=\"u.id\"><option :value=\"u.id\" x-text=\"u.unit_name + ' — Rp ' + u.price\"></option></template></select></td><td class=\"px-6 py-3.5\"><div class=\"flex items-center justify-center gap-1.5\"><button type=\"button\" @click=\"if (item.qty > 1) item.qty--\" class=\"w-8 h-8 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] font-bold text-sm flex items-center justify-center transition\">-</button> <input type=\"number\" x-model.number=\"item.qty\" min=\"1\" class=\"w-16 min-h-[34px] text-center text-sm font-bold bg-[#F5F5F7] border border-transparent focus:border-[#007AFF] focus:bg-white rounded-lg outline-none transition tabular-nums\"> <button type=\"button\" @click=\"item.qty++\" class=\"w-8 h-8 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] font-bold text-sm flex items-center justify-center transition\">+</button></div></td><td class=\"px-6 py-3.5 text-right font-bold text-[#007AFF] tabular-nums text-xs\"><span x-text=\"item.qty + ' lembar'\"></span></td><td class=\"px-6 py-3.5 text-right\"><button type=\"button\" @click=\"removeProduct(index)\" class=\"inline-flex items-center justify-center min-w-[36px] min-h-[36px] bg-[#FF3B30]/10 text-[#FF3B30] hover:bg-[#FF3B30]/20 rounded-xl transition\" title=\"Hapus dari antrean\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16\"></path></svg></button></td></tr></template></tbody></table><div x-show=\"selectedItems.length === 0\" class=\"py-16 text-center px-4\"><div class=\"w-14 h-14 mx-auto rounded-2xl bg-[#007AFF]/10 text-[#007AFF] flex items-center justify-center mb-3\"><svg class=\"w-7 h-7\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M7 7h10M7 11h10M7 15h6M4 4h16v16H4z\"></path></svg></div><h3 class=\"text-sm font-bold text-[#1D1D1F]\">Antrean Cetak Masih Kosong</h3><p class=\"text-xs text-[#8E8E93] max-w-sm mx-auto mt-1\">Ketik nama barang atau gunakan barcode scanner pada kolom pencarian di atas untuk memasukkan produk ke daftar cetak.</p></div></div><div class=\"p-4 sm:p-5 border-t border-[#E5E5EA] bg-[#F5F5F7]/40 flex flex-col sm:flex-row items-center justify-between gap-4\"><div class=\"flex flex-wrap items-center gap-4 sm:gap-6 text-sm\"><div><span class=\"text-xs text-[#8E8E93] block\">Jenis Produk</span> <span class=\"font-bold text-[#1D1D1F]\" x-text=\"selectedItems.length + ' produk'\"></span></div><div class=\"h-8 w-px bg-[#E5E5EA] hidden sm:block\"></div><div><span class=\"text-xs text-[#8E8E93] block\">Total Lembar Label</span> <span class=\"font-bold text-[#007AFF] tabular-nums\" x-text=\"totalCopies() + ' label'\"></span></div><div class=\"h-8 w-px bg-[#E5E5EA] hidden sm:block\"></div><div><span class=\"text-xs text-[#8E8E93] block\">Format Cetak</span> <span class=\"font-semibold text-[#1D1D1F]\" x-text=\"format === 'thermal' ? 'Roll Thermal 50x30mm' : 'Lembaran A4 (3 Kolom)'\"></span></div></div><div class=\"flex items-center gap-3 w-full sm:w-auto justify-end\"><a href=\"/products\" class=\"flex-1 sm:flex-none px-5 min-h-[44px] inline-flex items-center justify-center rounded-xl border border-[#E5E5EA] bg-white text-[#1D1D1F] text-sm font-semibold hover:bg-[#F5F5F7] transition shadow-xs\">Batal</a> <button type=\"button\" @click=\"submitForm()\" :disabled=\"selectedItems.length === 0\" class=\"flex-1 sm:flex-none bg-[#007AFF] hover:bg-[#0066D6] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 min-h-[44px] rounded-xl transition shadow-xs flex items-center justify-center gap-2\"><svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z\"></path></svg> <span>Buka Halaman Cetak Label</span></button></div></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = views.Base("Cetak Label Rak", "print-labels").Render(templ.WithChildren(ctx, templ_7745c5c3_Var52), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = views.Base("Cetak Label Rak", "print-labels").Render(templ.WithChildren(ctx, templ_7745c5c3_Var70), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1604,58 +1932,58 @@ func PrintLabelsPreviewView(labels []PrintLabelDTO, format string, storeName str
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var54 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var54 == nil {
-			templ_7745c5c3_Var54 = templ.NopComponent
+		templ_7745c5c3_Var72 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var72 == nil {
+			templ_7745c5c3_Var72 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 133, "<!doctype html><html lang=\"id\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Cetak Label Rak - ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 169, "<!doctype html><html lang=\"id\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Cetak Label Rak - ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var55 string
-		templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(storeName)
+		var templ_7745c5c3_Var73 string
+		templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinStringErrs(storeName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1677, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1804, Col: 39}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 134, "</title><script src=\"https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js\"></script><style>\n\t\t\t\t* {\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t}\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n\t\t\t\t\tmargin: 0;\n\t\t\t\t\tpadding: 0;\n\t\t\t\t\tbackground: #F5F5F7;\n\t\t\t\t\tcolor: #1D1D1F;\n\t\t\t\t}\n\t\t\t\t.no-print-bar {\n\t\t\t\t\tposition: sticky;\n\t\t\t\t\ttop: 0;\n\t\t\t\t\tleft: 0;\n\t\t\t\t\tright: 0;\n\t\t\t\t\tz-index: 100;\n\t\t\t\t\tbackground: #FFFFFF;\n\t\t\t\t\tborder-bottom: 1px solid #E5E5EA;\n\t\t\t\t\tpadding: 12px 24px;\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\tgap: 16px;\n\t\t\t\t\tbox-shadow: 0 2px 8px rgba(0,0,0,0.06);\n\t\t\t\t}\n\t\t\t\t.btn-print {\n\t\t\t\t\tbackground: #007AFF;\n\t\t\t\t\tcolor: #FFFFFF;\n\t\t\t\t\tborder: none;\n\t\t\t\t\tpadding: 9px 20px;\n\t\t\t\t\tborder-radius: 10px;\n\t\t\t\t\tfont-size: 13px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 8px;\n\t\t\t\t\ttransition: background 0.15s ease;\n\t\t\t\t}\n\t\t\t\t.btn-print:hover {\n\t\t\t\t\tbackground: #0066D6;\n\t\t\t\t}\n\t\t\t\t.btn-close {\n\t\t\t\t\tbackground: #E5E5EA;\n\t\t\t\t\tcolor: #1D1D1F;\n\t\t\t\t\tborder: none;\n\t\t\t\t\tpadding: 9px 16px;\n\t\t\t\t\tborder-radius: 10px;\n\t\t\t\t\tfont-size: 13px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t}\n\t\t\t\t.btn-close:hover {\n\t\t\t\t\tbackground: #D1D1D6;\n\t\t\t\t}\n\n\t\t\t\t/* Common Label Inner Typography */\n\t\t\t\t.store-title {\n\t\t\t\t\tfont-size: 7.5px;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.5px;\n\t\t\t\t\tcolor: #555;\n\t\t\t\t\tline-height: 1;\n\t\t\t\t\tmargin-bottom: 1px;\n\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t\toverflow: hidden;\n\t\t\t\t\ttext-overflow: ellipsis;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t}\n\t\t\t\t.product-title {\n\t\t\t\t\tfont-size: 9.5px;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\tline-height: 1.15;\n\t\t\t\t\tcolor: #000;\n\t\t\t\t\tdisplay: -webkit-box;\n\t\t\t\t\t-webkit-line-clamp: 2;\n\t\t\t\t\t-webkit-box-orient: vertical;\n\t\t\t\t\toverflow: hidden;\n\t\t\t\t\tmax-height: 22px;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tword-break: break-word;\n\t\t\t\t}\n\t\t\t\t.barcode-wrap {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tjustify-content: center;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tmargin: 1px 0;\n\t\t\t\t}\n\t\t\t\t.barcode-svg {\n\t\t\t\t\tmax-width: 100%;\n\t\t\t\t\theight: auto;\n\t\t\t\t}\n\t\t\t\t.price-row {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\talign-items: baseline;\n\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tborder-top: 1.5px solid #000;\n\t\t\t\t\tpadding-top: 1.5px;\n\t\t\t\t\tmargin-top: 1px;\n\t\t\t\t}\n\t\t\t\t.price-val {\n\t\t\t\t\tfont-size: 13.5px;\n\t\t\t\t\tfont-weight: 900;\n\t\t\t\t\tcolor: #000;\n\t\t\t\t\tline-height: 1;\n\t\t\t\t\tletter-spacing: -0.3px;\n\t\t\t\t}\n\t\t\t\t.price-meta {\n\t\t\t\t\tfont-size: 8px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tcolor: #333;\n\t\t\t\t\tline-height: 1;\n\t\t\t\t\ttext-align: right;\n\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t}\n\t\t\t</style>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 170, "</title><script src=\"https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js\"></script><style>\n\t\t\t\t* {\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t}\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n\t\t\t\t\tmargin: 0;\n\t\t\t\t\tpadding: 0;\n\t\t\t\t\tbackground: #F5F5F7;\n\t\t\t\t\tcolor: #1D1D1F;\n\t\t\t\t}\n\t\t\t\t.no-print-bar {\n\t\t\t\t\tposition: sticky;\n\t\t\t\t\ttop: 0;\n\t\t\t\t\tleft: 0;\n\t\t\t\t\tright: 0;\n\t\t\t\t\tz-index: 100;\n\t\t\t\t\tbackground: #FFFFFF;\n\t\t\t\t\tborder-bottom: 1px solid #E5E5EA;\n\t\t\t\t\tpadding: 12px 24px;\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\tgap: 16px;\n\t\t\t\t\tbox-shadow: 0 2px 8px rgba(0,0,0,0.06);\n\t\t\t\t}\n\t\t\t\t.btn-print {\n\t\t\t\t\tbackground: #007AFF;\n\t\t\t\t\tcolor: #FFFFFF;\n\t\t\t\t\tborder: none;\n\t\t\t\t\tpadding: 9px 20px;\n\t\t\t\t\tborder-radius: 10px;\n\t\t\t\t\tfont-size: 13px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 8px;\n\t\t\t\t\ttransition: background 0.15s ease;\n\t\t\t\t}\n\t\t\t\t.btn-print:hover {\n\t\t\t\t\tbackground: #0066D6;\n\t\t\t\t}\n\t\t\t\t.btn-close {\n\t\t\t\t\tbackground: #E5E5EA;\n\t\t\t\t\tcolor: #1D1D1F;\n\t\t\t\t\tborder: none;\n\t\t\t\t\tpadding: 9px 16px;\n\t\t\t\t\tborder-radius: 10px;\n\t\t\t\t\tfont-size: 13px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t}\n\t\t\t\t.btn-close:hover {\n\t\t\t\t\tbackground: #D1D1D6;\n\t\t\t\t}\n\n\t\t\t\t/* Common Label Inner Typography */\n\t\t\t\t.store-title {\n\t\t\t\t\tfont-size: 7.5px;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.5px;\n\t\t\t\t\tcolor: #555;\n\t\t\t\t\tline-height: 1;\n\t\t\t\t\tmargin-bottom: 1px;\n\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t\toverflow: hidden;\n\t\t\t\t\ttext-overflow: ellipsis;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t}\n\t\t\t\t.product-title {\n\t\t\t\t\tfont-size: 9.5px;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\tline-height: 1.15;\n\t\t\t\t\tcolor: #000;\n\t\t\t\t\tdisplay: -webkit-box;\n\t\t\t\t\t-webkit-line-clamp: 2;\n\t\t\t\t\t-webkit-box-orient: vertical;\n\t\t\t\t\toverflow: hidden;\n\t\t\t\t\tmax-height: 22px;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tword-break: break-word;\n\t\t\t\t}\n\t\t\t\t.barcode-wrap {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tjustify-content: center;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tmargin: 1px 0;\n\t\t\t\t}\n\t\t\t\t.barcode-svg {\n\t\t\t\t\tmax-width: 100%;\n\t\t\t\t\theight: auto;\n\t\t\t\t}\n\t\t\t\t.price-row {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\talign-items: baseline;\n\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tborder-top: 1.5px solid #000;\n\t\t\t\t\tpadding-top: 1.5px;\n\t\t\t\t\tmargin-top: 1px;\n\t\t\t\t}\n\t\t\t\t.price-val {\n\t\t\t\t\tfont-size: 13.5px;\n\t\t\t\t\tfont-weight: 900;\n\t\t\t\t\tcolor: #000;\n\t\t\t\t\tline-height: 1;\n\t\t\t\t\tletter-spacing: -0.3px;\n\t\t\t\t}\n\t\t\t\t.price-meta {\n\t\t\t\t\tfont-size: 8px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tcolor: #333;\n\t\t\t\t\tline-height: 1;\n\t\t\t\t\ttext-align: right;\n\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t}\n\t\t\t</style>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if format == "thermal" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 135, "<style>\n\t\t\t\t\t@page {\n\t\t\t\t\t\tsize: 50mm 30mm;\n\t\t\t\t\t\tmargin: 0;\n\t\t\t\t\t}\n\t\t\t\t\t.preview-container {\n\t\t\t\t\t\tpadding: 24px 0;\n\t\t\t\t\t\tdisplay: flex;\n\t\t\t\t\t\tflex-direction: column;\n\t\t\t\t\t\talign-items: center;\n\t\t\t\t\t\tgap: 12px;\n\t\t\t\t\t}\n\t\t\t\t\t.label-card {\n\t\t\t\t\t\twidth: 50mm;\n\t\t\t\t\t\theight: 30mm;\n\t\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t\t\tbackground: #FFFFFF;\n\t\t\t\t\t\tbox-shadow: 0 2px 6px rgba(0,0,0,0.1);\n\t\t\t\t\t\tborder: 1px solid #E5E5EA;\n\t\t\t\t\t\tpadding: 1.5mm 2mm;\n\t\t\t\t\t\tdisplay: flex;\n\t\t\t\t\t\tflex-direction: column;\n\t\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\t\talign-items: center;\n\t\t\t\t\t\ttext-align: center;\n\t\t\t\t\t\toverflow: hidden;\n\t\t\t\t\t\tpage-break-after: always;\n\t\t\t\t\t\tbreak-after: page;\n\t\t\t\t\t}\n\t\t\t\t\t@media print {\n\t\t\t\t\t\t.no-print-bar {\n\t\t\t\t\t\t\tdisplay: none !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tbody {\n\t\t\t\t\t\t\tbackground: #FFFFFF !important;\n\t\t\t\t\t\t\tpadding: 0 !important;\n\t\t\t\t\t\t\tmargin: 0 !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t.preview-container {\n\t\t\t\t\t\t\tpadding: 0 !important;\n\t\t\t\t\t\t\tgap: 0 !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t.label-card {\n\t\t\t\t\t\t\tbox-shadow: none !important;\n\t\t\t\t\t\t\tborder: none !important;\n\t\t\t\t\t\t\tmargin: 0 !important;\n\t\t\t\t\t\t\tpage-break-after: always !important;\n\t\t\t\t\t\t\tbreak-after: page !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t</style>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 171, "<style>\n\t\t\t\t\t@page {\n\t\t\t\t\t\tsize: 50mm 30mm;\n\t\t\t\t\t\tmargin: 0;\n\t\t\t\t\t}\n\t\t\t\t\t.preview-container {\n\t\t\t\t\t\tpadding: 24px 0;\n\t\t\t\t\t\tdisplay: flex;\n\t\t\t\t\t\tflex-direction: column;\n\t\t\t\t\t\talign-items: center;\n\t\t\t\t\t\tgap: 12px;\n\t\t\t\t\t}\n\t\t\t\t\t.label-card {\n\t\t\t\t\t\twidth: 50mm;\n\t\t\t\t\t\theight: 30mm;\n\t\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t\t\tbackground: #FFFFFF;\n\t\t\t\t\t\tbox-shadow: 0 2px 6px rgba(0,0,0,0.1);\n\t\t\t\t\t\tborder: 1px solid #E5E5EA;\n\t\t\t\t\t\tpadding: 1.5mm 2mm;\n\t\t\t\t\t\tdisplay: flex;\n\t\t\t\t\t\tflex-direction: column;\n\t\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\t\talign-items: center;\n\t\t\t\t\t\ttext-align: center;\n\t\t\t\t\t\toverflow: hidden;\n\t\t\t\t\t\tpage-break-after: always;\n\t\t\t\t\t\tbreak-after: page;\n\t\t\t\t\t}\n\t\t\t\t\t@media print {\n\t\t\t\t\t\t.no-print-bar {\n\t\t\t\t\t\t\tdisplay: none !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tbody {\n\t\t\t\t\t\t\tbackground: #FFFFFF !important;\n\t\t\t\t\t\t\tpadding: 0 !important;\n\t\t\t\t\t\t\tmargin: 0 !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t.preview-container {\n\t\t\t\t\t\t\tpadding: 0 !important;\n\t\t\t\t\t\t\tgap: 0 !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t.label-card {\n\t\t\t\t\t\t\tbox-shadow: none !important;\n\t\t\t\t\t\t\tborder: none !important;\n\t\t\t\t\t\t\tmargin: 0 !important;\n\t\t\t\t\t\t\tpage-break-after: always !important;\n\t\t\t\t\t\t\tbreak-after: page !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t</style>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 136, "<style>\n\t\t\t\t\t@page {\n\t\t\t\t\t\tsize: A4 portrait;\n\t\t\t\t\t\tmargin: 8mm;\n\t\t\t\t\t}\n\t\t\t\t\t.preview-container {\n\t\t\t\t\t\tmax-width: 210mm;\n\t\t\t\t\t\tmargin: 24px auto;\n\t\t\t\t\t\tpadding: 6mm;\n\t\t\t\t\t\tbackground: #FFFFFF;\n\t\t\t\t\t\tbox-shadow: 0 4px 16px rgba(0,0,0,0.08);\n\t\t\t\t\t\tborder-radius: 8px;\n\t\t\t\t\t}\n\t\t\t\t\t.a4-grid {\n\t\t\t\t\t\tdisplay: grid;\n\t\t\t\t\t\tgrid-template-columns: repeat(3, 62mm);\n\t\t\t\t\t\tgap: 3.5mm;\n\t\t\t\t\t\tjustify-content: center;\n\t\t\t\t\t}\n\t\t\t\t\t.label-card {\n\t\t\t\t\t\twidth: 62mm;\n\t\t\t\t\t\theight: 34mm;\n\t\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t\t\tborder: 1px dashed #A1A1A6;\n\t\t\t\t\t\tborder-radius: 4px;\n\t\t\t\t\t\tpadding: 2mm 3mm;\n\t\t\t\t\t\tdisplay: flex;\n\t\t\t\t\t\tflex-direction: column;\n\t\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\t\talign-items: center;\n\t\t\t\t\t\ttext-align: center;\n\t\t\t\t\t\toverflow: hidden;\n\t\t\t\t\t\tpage-break-inside: avoid;\n\t\t\t\t\t\tbreak-inside: avoid;\n\t\t\t\t\t\tbackground: #FFFFFF;\n\t\t\t\t\t}\n\t\t\t\t\t@media print {\n\t\t\t\t\t\t.no-print-bar {\n\t\t\t\t\t\t\tdisplay: none !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tbody {\n\t\t\t\t\t\t\tbackground: #FFFFFF !important;\n\t\t\t\t\t\t\tpadding: 0 !important;\n\t\t\t\t\t\t\tmargin: 0 !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t.preview-container {\n\t\t\t\t\t\t\tmargin: 0 !important;\n\t\t\t\t\t\t\tpadding: 0 !important;\n\t\t\t\t\t\t\tbox-shadow: none !important;\n\t\t\t\t\t\t\tborder-radius: 0 !important;\n\t\t\t\t\t\t\tmax-width: none !important;\n\t\t\t\t\t\t\twidth: 100% !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t.a4-grid {\n\t\t\t\t\t\t\tdisplay: grid !important;\n\t\t\t\t\t\t\tgrid-template-columns: repeat(3, 62mm) !important;\n\t\t\t\t\t\t\tgap: 3.5mm !important;\n\t\t\t\t\t\t\tjustify-content: center !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t.label-card {\n\t\t\t\t\t\t\tborder: 1px dashed #8E8E93 !important;\n\t\t\t\t\t\t\tbox-shadow: none !important;\n\t\t\t\t\t\t\tpage-break-inside: avoid !important;\n\t\t\t\t\t\t\tbreak-inside: avoid !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t</style>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 172, "<style>\n\t\t\t\t\t@page {\n\t\t\t\t\t\tsize: A4 portrait;\n\t\t\t\t\t\tmargin: 8mm;\n\t\t\t\t\t}\n\t\t\t\t\t.preview-container {\n\t\t\t\t\t\tmax-width: 210mm;\n\t\t\t\t\t\tmargin: 24px auto;\n\t\t\t\t\t\tpadding: 6mm;\n\t\t\t\t\t\tbackground: #FFFFFF;\n\t\t\t\t\t\tbox-shadow: 0 4px 16px rgba(0,0,0,0.08);\n\t\t\t\t\t\tborder-radius: 8px;\n\t\t\t\t\t}\n\t\t\t\t\t.a4-grid {\n\t\t\t\t\t\tdisplay: grid;\n\t\t\t\t\t\tgrid-template-columns: repeat(3, 62mm);\n\t\t\t\t\t\tgap: 3.5mm;\n\t\t\t\t\t\tjustify-content: center;\n\t\t\t\t\t}\n\t\t\t\t\t.label-card {\n\t\t\t\t\t\twidth: 62mm;\n\t\t\t\t\t\theight: 34mm;\n\t\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t\t\tborder: 1px dashed #A1A1A6;\n\t\t\t\t\t\tborder-radius: 4px;\n\t\t\t\t\t\tpadding: 2mm 3mm;\n\t\t\t\t\t\tdisplay: flex;\n\t\t\t\t\t\tflex-direction: column;\n\t\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\t\talign-items: center;\n\t\t\t\t\t\ttext-align: center;\n\t\t\t\t\t\toverflow: hidden;\n\t\t\t\t\t\tpage-break-inside: avoid;\n\t\t\t\t\t\tbreak-inside: avoid;\n\t\t\t\t\t\tbackground: #FFFFFF;\n\t\t\t\t\t}\n\t\t\t\t\t@media print {\n\t\t\t\t\t\t.no-print-bar {\n\t\t\t\t\t\t\tdisplay: none !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tbody {\n\t\t\t\t\t\t\tbackground: #FFFFFF !important;\n\t\t\t\t\t\t\tpadding: 0 !important;\n\t\t\t\t\t\t\tmargin: 0 !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t.preview-container {\n\t\t\t\t\t\t\tmargin: 0 !important;\n\t\t\t\t\t\t\tpadding: 0 !important;\n\t\t\t\t\t\t\tbox-shadow: none !important;\n\t\t\t\t\t\t\tborder-radius: 0 !important;\n\t\t\t\t\t\t\tmax-width: none !important;\n\t\t\t\t\t\t\twidth: 100% !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t.a4-grid {\n\t\t\t\t\t\t\tdisplay: grid !important;\n\t\t\t\t\t\t\tgrid-template-columns: repeat(3, 62mm) !important;\n\t\t\t\t\t\t\tgap: 3.5mm !important;\n\t\t\t\t\t\t\tjustify-content: center !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t.label-card {\n\t\t\t\t\t\t\tborder: 1px dashed #8E8E93 !important;\n\t\t\t\t\t\t\tbox-shadow: none !important;\n\t\t\t\t\t\t\tpage-break-inside: avoid !important;\n\t\t\t\t\t\t\tbreak-inside: avoid !important;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t</style>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 137, "</head><body><div class=\"no-print-bar\"><div><strong style=\"font-size: 15px;\">Preview Label Rak Toko</strong> <span style=\"font-size: 12px; color: #8E8E93; margin-left: 8px;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 173, "</head><body><div class=\"no-print-bar\"><div><strong style=\"font-size: 15px;\">Preview Label Rak Toko</strong> <span style=\"font-size: 12px; color: #8E8E93; margin-left: 8px;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var56 string
-		templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d Label • Format: %s", len(labels), strings.ToUpper(format)))
+		var templ_7745c5c3_Var74 string
+		templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d Label • Format: %s", len(labels), strings.ToUpper(format)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1926, Col: 84}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 2053, Col: 84}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var74))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 138, "</span></div><div style=\"display: flex; gap: 8px;\"><button class=\"btn-close\" onclick=\"window.close()\">Tutup Tab</button> <button class=\"btn-print\" onclick=\"window.print()\"><svg width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z\"></path></svg> <span>Cetak Sekarang (Ctrl+P)</span></button></div></div><div class=\"preview-container\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 174, "</span></div><div style=\"display: flex; gap: 8px;\"><button class=\"btn-close\" onclick=\"window.close()\">Tutup Tab</button> <button class=\"btn-print\" onclick=\"window.print()\"><svg width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z\"></path></svg> <span>Cetak Sekarang (Ctrl+P)</span></button></div></div><div class=\"preview-container\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if format == "a4" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 139, "<div class=\"a4-grid\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 175, "<div class=\"a4-grid\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1665,7 +1993,7 @@ func PrintLabelsPreviewView(labels []PrintLabelDTO, format string, storeName str
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 140, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 176, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1677,7 +2005,7 @@ func PrintLabelsPreviewView(labels []PrintLabelDTO, format string, storeName str
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 141, "</div><script>\n\t\t\t\twindow.addEventListener('load', function() {\n\t\t\t\t\ttry {\n\t\t\t\t\t\tJsBarcode(\".barcode-svg\").init();\n\t\t\t\t\t} catch(e) {\n\t\t\t\t\t\tconsole.error(\"JsBarcode error:\", e);\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 177, "</div><script>\n\t\t\t\twindow.addEventListener('load', function() {\n\t\t\t\t\ttry {\n\t\t\t\t\t\tJsBarcode(\".barcode-svg\").init();\n\t\t\t\t\t} catch(e) {\n\t\t\t\t\t\tconsole.error(\"JsBarcode error:\", e);\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1701,90 +2029,90 @@ func renderLabelCard(label PrintLabelDTO) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var57 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var57 == nil {
-			templ_7745c5c3_Var57 = templ.NopComponent
+		templ_7745c5c3_Var75 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var75 == nil {
+			templ_7745c5c3_Var75 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 142, "<div class=\"label-card\"><div class=\"store-title\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 178, "<div class=\"label-card\"><div class=\"store-title\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var58 string
-		templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(label.StoreName)
+		var templ_7745c5c3_Var76 string
+		templ_7745c5c3_Var76, templ_7745c5c3_Err = templ.JoinStringErrs(label.StoreName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1965, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 2092, Col: 44}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 143, "</div><div class=\"product-title\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var76))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var59 string
-		templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(label.ProductName)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1966, Col: 48}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 179, "</div><div class=\"product-title\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 144, "</div><div class=\"barcode-wrap\"><svg class=\"barcode-svg\" jsbarcode-format=\"CODE128\" jsbarcode-value=\"")
+		var templ_7745c5c3_Var77 string
+		templ_7745c5c3_Var77, templ_7745c5c3_Err = templ.JoinStringErrs(label.ProductName)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 2093, Col: 48}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var77))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var60 string
-		templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.ResolveAttributeValue(label.SKU)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1971, Col: 31}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var60)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 180, "</div><div class=\"barcode-wrap\"><svg class=\"barcode-svg\" jsbarcode-format=\"CODE128\" jsbarcode-value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 145, "\" jsbarcode-width=\"1.2\" jsbarcode-height=\"22\" jsbarcode-textmargin=\"0\" jsbarcode-fontsize=\"8\" jsbarcode-margin=\"0\"></svg></div><div class=\"price-row\"><div class=\"price-val\">Rp ")
+		var templ_7745c5c3_Var78 string
+		templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.ResolveAttributeValue(label.SKU)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 2098, Col: 31}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var78)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var61 string
-		templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(label.FormattedPrice)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1980, Col: 51}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 181, "\" jsbarcode-width=\"1.2\" jsbarcode-height=\"22\" jsbarcode-textmargin=\"0\" jsbarcode-fontsize=\"8\" jsbarcode-margin=\"0\"></svg></div><div class=\"price-row\"><div class=\"price-val\">Rp ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 146, "</div><div class=\"price-meta\">/")
+		var templ_7745c5c3_Var79 string
+		templ_7745c5c3_Var79, templ_7745c5c3_Err = templ.JoinStringErrs(label.FormattedPrice)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 2107, Col: 51}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var79))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var62 string
-		templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(label.UnitName)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1981, Col: 44}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 182, "</div><div class=\"price-meta\">/")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 147, " <span style=\"font-size: 7px; color: #777;\">• ")
+		var templ_7745c5c3_Var80 string
+		templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.JoinStringErrs(label.UnitName)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 2108, Col: 44}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var80))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var63 string
-		templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.JoinStringErrs(label.PrintDate)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 1981, Col: 111}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var63))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 183, " <span style=\"font-size: 7px; color: #777;\">• ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 148, "</span></div></div></div>")
+		var templ_7745c5c3_Var81 string
+		templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(label.PrintDate)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/products/view.templ`, Line: 2108, Col: 111}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 184, "</span></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -175,7 +175,7 @@ func CreateCustomerPage() templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"max-w-md mx-4 sm:mx-auto py-8\"><div class=\"bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8\"><div class=\"flex items-center gap-3 mb-6\"><a href=\"/customers\" class=\"min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition\"><svg class=\"w-6 h-6\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M10 19l-7-7m0 0l7-7m-7 7h18\"></path></svg></a><h2 class=\"text-2xl font-bold text-[#1D1D1F]\">Tambah Pelanggan Baru</h2></div><form hx-post=\"/customers\" class=\"space-y-5\"><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Nama Pelanggan <span class=\"text-[#FF3B30]\">*</span></label> <input class=\"w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] transition capitalize\" type=\"text\" name=\"name\" placeholder=\"Misal: Bpk. Ahmad Dahlan\" required></div><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">No. Telepon / WhatsApp (Opsional)</label> <input class=\"w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] transition\" type=\"text\" name=\"phone\" placeholder=\"Misal: 081234567890\"></div><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Alamat / Keterangan (Opsional)</label> <textarea class=\"w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 py-3 outline-none focus:bg-white focus:border-[#007AFF] transition\" name=\"address\" rows=\"3\" placeholder=\"Misal: RT 02 / RW 04, Belakang Balai Desa\"></textarea></div><div class=\"pt-4\"><button type=\"submit\" class=\"bg-[#007AFF] text-white px-4 min-h-[48px] rounded-xl font-semibold w-full hover:bg-[#0066D6] transition shadow-xs\">Simpan Pelanggan</button></div></form></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"max-w-md mx-4 sm:mx-auto py-8\"><div class=\"bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8\"><div class=\"flex items-center gap-3 mb-6\"><a href=\"/customers\" class=\"min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition\"><svg class=\"w-6 h-6\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M10 19l-7-7m0 0l7-7m-7 7h18\"></path></svg></a><h2 class=\"text-2xl font-bold text-[#1D1D1F]\">Tambah Pelanggan Baru</h2></div><form hx-post=\"/customers\" class=\"space-y-5\"><div data-form-error class=\"hidden p-3.5 rounded-xl bg-[#FF3B30]/10 border border-[#FF3B30]/20 text-[#FF3B30] text-sm flex items-start gap-2.5 transition\"><svg class=\"w-5 h-5 flex-shrink-0 mt-0.5\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z\"></path></svg><div class=\"flex-1 font-medium error-text\"></div></div><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Nama Pelanggan <span class=\"text-[#FF3B30]\">*</span></label> <input class=\"w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] transition capitalize\" type=\"text\" name=\"name\" placeholder=\"Misal: Bpk. Ahmad Dahlan\" required></div><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">No. Telepon / WhatsApp (Opsional)</label> <input class=\"w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] transition\" type=\"text\" name=\"phone\" placeholder=\"Misal: 081234567890\"></div><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Alamat / Keterangan (Opsional)</label> <textarea class=\"w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 py-3 outline-none focus:bg-white focus:border-[#007AFF] transition\" name=\"address\" rows=\"3\" placeholder=\"Misal: RT 02 / RW 04, Belakang Balai Desa\"></textarea></div><div class=\"pt-4\"><button type=\"submit\" class=\"bg-[#007AFF] text-white px-4 min-h-[48px] rounded-xl font-semibold w-full hover:bg-[#0066D6] transition shadow-xs\">Simpan Pelanggan</button></div></form></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -234,7 +234,7 @@ func EditCustomerPage(c repo.Customer) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/customers/%d/restore", c.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 127, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 133, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 				if templ_7745c5c3_Err != nil {
@@ -252,20 +252,20 @@ func EditCustomerPage(c repo.Customer) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue("/customers/" + fmt.Sprint(c.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 136, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 142, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" class=\"space-y-5\"><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Nama Pelanggan <span class=\"text-[#FF3B30]\">*</span></label> <input class=\"w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] transition capitalize\" type=\"text\" name=\"name\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" class=\"space-y-5\"><div data-form-error class=\"hidden p-3.5 rounded-xl bg-[#FF3B30]/10 border border-[#FF3B30]/20 text-[#FF3B30] text-sm flex items-start gap-2.5 transition\"><svg class=\"w-5 h-5 flex-shrink-0 mt-0.5\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z\"></path></svg><div class=\"flex-1 font-medium error-text\"></div></div><div><label class=\"block text-sm font-medium text-[#1D1D1F] mb-1.5\">Nama Pelanggan <span class=\"text-[#FF3B30]\">*</span></label> <input class=\"w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] transition capitalize\" type=\"text\" name=\"name\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 139, Col: 207}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 151, Col: 207}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 			if templ_7745c5c3_Err != nil {
@@ -278,7 +278,7 @@ func EditCustomerPage(c repo.Customer) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.Phone.String)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 143, Col: 205}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 155, Col: 205}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 			if templ_7745c5c3_Err != nil {
@@ -291,7 +291,7 @@ func EditCustomerPage(c repo.Customer) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(c.Address.String)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 147, Col: 195}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 159, Col: 195}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -344,7 +344,7 @@ func CustomerTable(customers []repo.Customer, status string) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(i + 1))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 176, Col: 88}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 188, Col: 88}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -357,7 +357,7 @@ func CustomerTable(customers []repo.Customer, status string) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 179, Col: 22}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 191, Col: 22}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -381,7 +381,7 @@ func CustomerTable(customers []repo.Customer, status string) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(c.Phone.String)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 189, Col: 24}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 201, Col: 24}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -401,7 +401,7 @@ func CustomerTable(customers []repo.Customer, status string) templ.Component {
 				var templ_7745c5c3_Var17 string
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(c.Address.String)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 196, Col: 26}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 208, Col: 26}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
@@ -425,7 +425,7 @@ func CustomerTable(customers []repo.Customer, status string) templ.Component {
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/customers/%d/restore", c.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 206, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 218, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 				if templ_7745c5c3_Err != nil {
@@ -443,7 +443,7 @@ func CustomerTable(customers []repo.Customer, status string) templ.Component {
 				var templ_7745c5c3_Var19 templ.SafeURL
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/customers/%d/edit", c.ID)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 216, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 228, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -456,7 +456,7 @@ func CustomerTable(customers []repo.Customer, status string) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/customers/%d", c.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 226, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/customers/view.templ`, Line: 238, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 				if templ_7745c5c3_Err != nil {

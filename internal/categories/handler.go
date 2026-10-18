@@ -120,7 +120,7 @@ func (h *handler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.service.UpdateCategory(r.Context(), int32(id), code, name); err != nil {
 		log.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 

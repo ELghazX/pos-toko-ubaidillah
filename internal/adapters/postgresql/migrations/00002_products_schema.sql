@@ -1,0 +1,29 @@
+-- +goose Up
+CREATE TABLE products (
+	id SERIAL PRIMARY KEY,
+	category_id INT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+	sku VARCHAR(50) NOT NULL UNIQUE, 
+	name VARCHAR(100) NOT NULL,    
+	type VARCHAR(20) NOT NULL DEFAULT 'barang', -- 'barang' or 'jasa'
+	is_open_price BOOLEAN NOT NULL DEFAULT FALSE,
+	current_stock int NOT NULL DEFAULT 0,
+	average_cost NUMERIC(15,2) DEFAULT 0, -- Modal / HPP Moving Average
+	is_active BOOLEAN DEFAULT true,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE product_units (
+	id SERIAL PRIMARY KEY,
+	product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+	unit_name VARCHAR(50) NOT NULL, 
+	conversion_qty INT NOT NULL DEFAULT 1,
+	price NUMERIC(15,2) NOT NULL DEFAULT 0,
+	is_active BOOLEAN DEFAULT true,
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+-- +goose Down
+DROP TABLE IF EXISTS product_units;
+DROP TABLE IF EXISTS products;
+

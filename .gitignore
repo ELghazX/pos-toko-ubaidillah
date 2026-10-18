@@ -12,5 +12,6 @@
 .DS_Store
 Thumbs.db
 
-BLUEPRINT.md
-tailwindcss
+*.md
+
+!README.md

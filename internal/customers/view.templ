@@ -1,0 +1,254 @@
+package customers
+
+import (
+	"fmt"
+	repo "github.com/ELghazX/pos-toko-ubaidillah/internal/adapters/postgresql/sqlc"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/views"
+)
+
+templ CustomerPage(customers []repo.Customer, query string, sortBy string, status string) {
+	@views.Base("Master Pelanggan", "customers") {
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+				<div>
+					<h1 class="text-3xl font-bold text-[#1D1D1F] tracking-tight">Data Pelanggan</h1>
+					<p class="text-sm text-[#8E8E93] mt-1">Kelola data pelanggan untuk transaksi kasir dan pencatatan kasbon.</p>
+				</div>
+				<a href="/customers/new" class="bg-[#007AFF] text-white px-5 min-h-[44px] rounded-xl font-medium inline-flex items-center gap-2 hover:bg-[#0066D6] transition shadow-xs self-start sm:self-auto">
+					+ Tambah Pelanggan
+				</a>
+			</div>
+			<div class="flex flex-col sm:flex-row gap-3 mb-4 items-center justify-between">
+				<div class="relative w-full sm:w-80">
+					<input
+						type="text"
+						name="q"
+						value={ query }
+						placeholder="Cari nama, telepon, atau alamat..."
+						class="w-full pl-10 pr-4 min-h-[44px] bg-white border border-[#E5E5EA] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/customers"
+						hx-target="#customer-table-container"
+						hx-swap="outerHTML"
+						hx-trigger="keyup changed delay:300ms, search"
+						hx-include="[name='sort'], [name='status']"
+					/>
+					<svg class="w-5 h-5 text-[#8E8E93] absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+				</div>
+				<div class="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
+					<div class="flex items-center gap-2 text-sm text-[#8E8E93]">
+						<span>Status:</span>
+						<select
+							name="status"
+							class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							hx-get="/customers"
+							hx-target="#customer-table-container"
+							hx-swap="outerHTML"
+							hx-include="[name='q'], [name='sort']"
+						>
+							<option value="active" selected?={ status == "active" || status == "" }>Aktif</option>
+							<option value="inactive" selected?={ status == "inactive" }>Nonaktif / Terhapus</option>
+							<option value="all" selected?={ status == "all" }>Semua Status</option>
+						</select>
+					</div>
+					<div class="flex items-center gap-2 text-sm text-[#8E8E93]">
+						<span>Urutkan:</span>
+						<select
+							name="sort"
+							class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							hx-get="/customers"
+							hx-target="#customer-table-container"
+							hx-swap="outerHTML"
+							hx-include="[name='q'], [name='status']"
+						>
+							<option value="name_asc" selected?={ sortBy == "name_asc" }>Nama (A-Z)</option>
+							<option value="name_desc" selected?={ sortBy == "name_desc" }>Nama (Z-A)</option>
+							<option value="newest" selected?={ sortBy == "newest" }>Terbaru</option>
+						</select>
+					</div>
+				</div>
+			</div>
+			@CustomerTable(customers, status)
+		</div>
+	}
+}
+
+templ CreateCustomerPage() {
+	@views.Base("Tambah Pelanggan", "customers") {
+		<div class="max-w-md mx-4 sm:mx-auto py-8">
+			<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8">
+				<div class="flex items-center gap-3 mb-6">
+					<a href="/customers" class="min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition">
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+					</a>
+					<h2 class="text-2xl font-bold text-[#1D1D1F]">Tambah Pelanggan Baru</h2>
+				</div>
+				<form hx-post="/customers" class="space-y-5">
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Nama Pelanggan <span class="text-[#FF3B30]">*</span></label>
+						<input class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] transition capitalize" type="text" name="name" placeholder="Misal: Bpk. Ahmad Dahlan" required/>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">No. Telepon / WhatsApp (Opsional)</label>
+						<input class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] transition" type="text" name="phone" placeholder="Misal: 081234567890"/>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Alamat / Keterangan (Opsional)</label>
+						<textarea class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 py-3 outline-none focus:bg-white focus:border-[#007AFF] transition" name="address" rows="3" placeholder="Misal: RT 02 / RW 04, Belakang Balai Desa"></textarea>
+					</div>
+					<div class="pt-4">
+						<button type="submit" class="bg-[#007AFF] text-white px-4 min-h-[48px] rounded-xl font-semibold w-full hover:bg-[#0066D6] transition shadow-xs">
+							Simpan Pelanggan
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
+
+templ EditCustomerPage(c repo.Customer) {
+	@views.Base("Ubah Pelanggan", "customers") {
+		<div class="max-w-md mx-4 sm:mx-auto py-8">
+			<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8">
+				<div class="flex items-center gap-3 mb-6">
+					<a href="/customers" class="min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition">
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+					</a>
+					<h2 class="text-2xl font-bold text-[#1D1D1F]">Ubah Pelanggan</h2>
+				</div>
+				if c.IsActive.Valid && !c.IsActive.Bool {
+					<div class="mb-5 p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+						<div class="flex items-center gap-2 text-amber-800">
+							<svg class="w-4 h-4 flex-shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+							<span>Pelanggan ini sedang berstatus <strong>Nonaktif</strong>.</span>
+						</div>
+						<button
+							type="button"
+							hx-post={ fmt.Sprintf("/customers/%d/restore", c.ID) }
+							hx-confirm="Aktifkan kembali pelanggan ini ke daftar master aktif?"
+							class="px-3 min-h-[36px] bg-[#34C759] hover:bg-[#2DB34D] text-white rounded-lg font-semibold transition shadow-xs flex-shrink-0 inline-flex items-center gap-1"
+						>
+							<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+							<span>Aktifkan</span>
+						</button>
+					</div>
+				}
+				<form hx-put={ "/customers/" + fmt.Sprint(c.ID) } class="space-y-5">
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Nama Pelanggan <span class="text-[#FF3B30]">*</span></label>
+						<input class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] transition capitalize" type="text" name="name" value={ c.Name } required/>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">No. Telepon / WhatsApp</label>
+						<input class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] transition" type="text" name="phone" value={ c.Phone.String }/>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Alamat / Keterangan</label>
+						<textarea class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 py-3 outline-none focus:bg-white focus:border-[#007AFF] transition" name="address" rows="3">{ c.Address.String }</textarea>
+					</div>
+					<div class="pt-4">
+						<button type="submit" class="bg-[#007AFF] text-white px-4 min-h-[48px] rounded-xl font-semibold w-full hover:bg-[#0066D6] transition shadow-xs">
+							Simpan Perubahan
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
+
+templ CustomerTable(customers []repo.Customer, status string) {
+	<div id="customer-table-container" class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] overflow-hidden mt-4">
+		<div class="overflow-x-auto">
+			<table class="w-full text-left border-collapse">
+			<thead class="bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]">
+				<tr>
+					<th class="px-6 py-3.5 font-medium w-16 text-right">No</th>
+					<th class="px-6 py-3.5 font-medium">Nama Pelanggan</th>
+					<th class="px-6 py-3.5 font-medium">Telepon</th>
+					<th class="px-6 py-3.5 font-medium">Alamat</th>
+					<th class="px-6 py-3.5 font-medium text-right">Aksi</th>
+				</tr>
+			</thead>
+			<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+				for i, c := range customers {
+					<tr class="hover:bg-[#F5F5F7]/50 transition">
+						<td class="px-6 py-3.5 text-[#8E8E93] text-right tabular-nums">{ fmt.Sprint(i + 1) }</td>
+						<td class="px-6 py-3.5 font-semibold text-[#1D1D1F]">
+							<div class="flex items-center gap-2">
+								<span>{ c.Name }</span>
+								if c.IsActive.Valid && !c.IsActive.Bool {
+									<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-500 border border-gray-200">
+										Nonaktif
+									</span>
+								}
+							</div>
+						</td>
+						<td class="px-6 py-3.5 text-gray-600 tabular-nums">
+							if c.Phone.String != "" {
+								{ c.Phone.String }
+							} else {
+								<span class="text-[#8E8E93]">-</span>
+							}
+						</td>
+						<td class="px-6 py-3.5 text-gray-600">
+							if c.Address.String != "" {
+								{ c.Address.String }
+							} else {
+								<span class="text-[#8E8E93]">-</span>
+							}
+						</td>
+						<td class="px-6 py-3.5 text-right">
+							<div class="flex items-center justify-end gap-2">
+								if c.IsActive.Valid && !c.IsActive.Bool {
+									<button
+										type="button"
+										hx-post={ fmt.Sprintf("/customers/%d/restore", c.ID) }
+										hx-confirm="Aktifkan kembali pelanggan ini ke daftar master aktif?"
+										class="inline-flex items-center justify-center gap-1.5 px-3 min-h-[44px] bg-[#34C759]/10 text-[#34C759] hover:bg-[#34C759]/20 rounded-xl font-semibold text-xs transition"
+										title="Aktifkan Kembali Pelanggan"
+									>
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+										<span>Aktifkan</span>
+									</button>
+								} else {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/customers/%d/edit", c.ID)) }
+										class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 rounded-xl transition"
+										title="Ubah Pelanggan"
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+											<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"></path>
+										</svg>
+									</a>
+									<button
+										type="button"
+										hx-delete={ fmt.Sprintf("/customers/%d", c.ID) }
+										hx-target="closest tr"
+										hx-swap="outerHTML"
+										hx-confirm="Yakin ingin menghapus pelanggan ini?"
+										hx-on::response-error="alert(event.detail.xhr.responseText || 'Gagal menghapus pelanggan.')"
+										class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#FF3B30]/10 text-[#FF3B30] hover:bg-[#FF3B30]/20 rounded-xl transition"
+										title="Hapus Pelanggan"
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+											<path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"></path>
+										</svg>
+									</button>
+								}
+							</div>
+						</td>
+					</tr>
+				}
+				if len(customers) == 0 {
+					<tr>
+						<td colspan="5" class="px-6 py-8 text-center text-[#8E8E93]">
+							Belum ada data pelanggan.
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+		</div>
+	</div>
+}

@@ -9,57 +9,170 @@ import (
 )
 
 type Category struct {
-	ID        int32            `json:"id"`
-	Code      string           `json:"code"`
-	Name      string           `json:"name"`
-	IsActive  pgtype.Bool      `json:"is_active"`
-	CreatedAt pgtype.Timestamp `json:"created_at"`
-	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+	ID        int32              `json:"id"`
+	Code      string             `json:"code"`
+	Name      string             `json:"name"`
+	IsActive  pgtype.Bool        `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type CompanyConfig struct {
+	ID            int32              `json:"id"`
+	Name          string             `json:"name"`
+	Tagline       string             `json:"tagline"`
+	Phone         string             `json:"phone"`
+	Address       string             `json:"address"`
+	ReceiptFooter string             `json:"receipt_footer"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Customer struct {
-	ID        int32            `json:"id"`
-	Name      string           `json:"name"`
-	Phone     pgtype.Text      `json:"phone"`
-	Address   pgtype.Text      `json:"address"`
-	IsActive  pgtype.Bool      `json:"is_active"`
-	CreatedAt pgtype.Timestamp `json:"created_at"`
-	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+	ID        int32              `json:"id"`
+	Name      string             `json:"name"`
+	Phone     pgtype.Text        `json:"phone"`
+	Address   pgtype.Text        `json:"address"`
+	IsActive  pgtype.Bool        `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type DebtPayment struct {
+	ID         int32              `json:"id"`
+	SaleID     int32              `json:"sale_id"`
+	Date       pgtype.Timestamptz `json:"date"`
+	AmountPaid pgtype.Numeric     `json:"amount_paid"`
+	Notes      string             `json:"notes"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type InventoryLedger struct {
+	ID              int32              `json:"id"`
+	ProductID       int32              `json:"product_id"`
+	Date            pgtype.Timestamptz `json:"date"`
+	TransactionType string             `json:"transaction_type"`
+	ReferenceID     pgtype.Int4        `json:"reference_id"`
+	QtyChange       int32              `json:"qty_change"`
+	BalanceAfter    int32              `json:"balance_after"`
+	Notes           string             `json:"notes"`
 }
 
 type Product struct {
-	ID           int32            `json:"id"`
-	CategoryID   pgtype.Int4      `json:"category_id"`
-	Sku          string           `json:"sku"`
-	Barcode      pgtype.Text      `json:"barcode"`
-	Name         string           `json:"name"`
-	Type         pgtype.Text      `json:"type"`
-	BaseUnit     string           `json:"base_unit"`
-	IsOpenPrice  pgtype.Bool      `json:"is_open_price"`
-	CurrentStock pgtype.Int4      `json:"current_stock"`
-	AverageCost  pgtype.Numeric   `json:"average_cost"`
-	IsActive     pgtype.Bool      `json:"is_active"`
-	CreatedAt    pgtype.Timestamp `json:"created_at"`
-	UpdatedAt    pgtype.Timestamp `json:"updated_at"`
+	ID           int32              `json:"id"`
+	CategoryID   int32              `json:"category_id"`
+	Sku          string             `json:"sku"`
+	Name         string             `json:"name"`
+	Type         string             `json:"type"`
+	IsOpenPrice  bool               `json:"is_open_price"`
+	CurrentStock int32              `json:"current_stock"`
+	AverageCost  pgtype.Numeric     `json:"average_cost"`
+	IsActive     pgtype.Bool        `json:"is_active"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	MinStock     int32              `json:"min_stock"`
 }
 
 type ProductUnit struct {
-	ID            int32            `json:"id"`
-	ProductID     pgtype.Int4      `json:"product_id"`
-	UnitName      string           `json:"unit_name"`
-	ConversionQty int32            `json:"conversion_qty"`
-	Price         pgtype.Numeric   `json:"price"`
-	IsActive      pgtype.Bool      `json:"is_active"`
-	CreatedAt     pgtype.Timestamp `json:"created_at"`
-	UpdatedAt     pgtype.Timestamp `json:"updated_at"`
+	ID            int32              `json:"id"`
+	ProductID     int32              `json:"product_id"`
+	UnitName      string             `json:"unit_name"`
+	ConversionQty int32              `json:"conversion_qty"`
+	Price         pgtype.Numeric     `json:"price"`
+	IsActive      pgtype.Bool        `json:"is_active"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Purchase struct {
+	ID            int32              `json:"id"`
+	InvoiceNumber string             `json:"invoice_number"`
+	SupplierID    pgtype.Int4        `json:"supplier_id"`
+	PaymentMethod string             `json:"payment_method"`
+	TotalCost     pgtype.Numeric     `json:"total_cost"`
+	Status        string             `json:"status"`
+	Notes         string             `json:"notes"`
+	Date          pgtype.Timestamptz `json:"date"`
+	ReceivedAt    pgtype.Timestamptz `json:"received_at"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type PurchaseDetail struct {
+	ID            int32          `json:"id"`
+	PurchaseID    int32          `json:"purchase_id"`
+	ProductID     int32          `json:"product_id"`
+	UnitID        pgtype.Int4    `json:"unit_id"`
+	UnitName      string         `json:"unit_name"`
+	ConversionQty int32          `json:"conversion_qty"`
+	Qty           int32          `json:"qty"`
+	Cost          pgtype.Numeric `json:"cost"`
+	Subtotal      pgtype.Numeric `json:"subtotal"`
+}
+
+type Sale struct {
+	ID             int32              `json:"id"`
+	InvoiceNo      string             `json:"invoice_no"`
+	CustomerID     pgtype.Int4        `json:"customer_id"`
+	Date           pgtype.Timestamptz `json:"date"`
+	TotalAmount    pgtype.Numeric     `json:"total_amount"`
+	DiscountAmount pgtype.Numeric     `json:"discount_amount"`
+	PaidAmount     pgtype.Numeric     `json:"paid_amount"`
+	ChangeAmount   pgtype.Numeric     `json:"change_amount"`
+	PaymentMethod  string             `json:"payment_method"`
+	PaymentStatus  string             `json:"payment_status"`
+	DueDate        pgtype.Date        `json:"due_date"`
+	Status         string             `json:"status"`
+	Notes          string             `json:"notes"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type SaleDetail struct {
+	ID            int32          `json:"id"`
+	SaleID        int32          `json:"sale_id"`
+	ProductID     int32          `json:"product_id"`
+	UnitID        pgtype.Int4    `json:"unit_id"`
+	UnitName      string         `json:"unit_name"`
+	ConversionQty int32          `json:"conversion_qty"`
+	Qty           int32          `json:"qty"`
+	Price         pgtype.Numeric `json:"price"`
+	Discount      pgtype.Numeric `json:"discount"`
+	Subtotal      pgtype.Numeric `json:"subtotal"`
+	Cogs          pgtype.Numeric `json:"cogs"`
+	IsOpenPrice   bool           `json:"is_open_price"`
+}
+
+type StockAdjustment struct {
+	ID            int32              `json:"id"`
+	AdjustmentNo  string             `json:"adjustment_no"`
+	Date          pgtype.Timestamptz `json:"date"`
+	ProductID     int32              `json:"product_id"`
+	SystemStock   int32              `json:"system_stock"`
+	PhysicalStock int32              `json:"physical_stock"`
+	DifferenceQty int32              `json:"difference_qty"`
+	Reason        string             `json:"reason"`
+	Notes         string             `json:"notes"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 
 type Supplier struct {
-	ID        int32            `json:"id"`
-	Name      string           `json:"name"`
-	Phone     pgtype.Text      `json:"phone"`
-	Address   pgtype.Text      `json:"address"`
-	IsActive  pgtype.Bool      `json:"is_active"`
-	CreatedAt pgtype.Timestamp `json:"created_at"`
-	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+	ID        int32              `json:"id"`
+	Name      string             `json:"name"`
+	Phone     pgtype.Text        `json:"phone"`
+	Address   pgtype.Text        `json:"address"`
+	IsActive  pgtype.Bool        `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type User struct {
+	ID           int32              `json:"id"`
+	Username     string             `json:"username"`
+	Name         string             `json:"name"`
+	PasswordHash string             `json:"password_hash"`
+	Role         string             `json:"role"`
+	IsActive     bool               `json:"is_active"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	repo "github.com/ELghazX/pos-toko-ubaidillah/internal/adapters/postgresql/sqlc"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/utils"
 )
 
 type Service interface {
@@ -43,7 +44,7 @@ func (s *svc) CreateCategory(ctx context.Context, code, name string) (repo.Categ
 
 	arg := repo.CreateCategoryParams{
 		Code: code,
-		Name: name,
+		Name: utils.ToPascalCase(name),
 	}
 	return s.repo.CreateCategory(ctx, arg)
 }
@@ -58,7 +59,7 @@ func (s *svc) UpdateCategory(ctx context.Context, id int32, code, name string) e
 	arg := repo.UpdateCategoryParams{
 		ID:   id,
 		Code: code,
-		Name: name,
+		Name: utils.ToPascalCase(name),
 	}
 	return s.repo.UpdateCategory(ctx, arg)
 }

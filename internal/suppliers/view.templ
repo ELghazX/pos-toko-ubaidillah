@@ -1,0 +1,203 @@
+package suppliers
+
+import (
+	"fmt"
+	repo "github.com/ELghazX/pos-toko-ubaidillah/internal/adapters/postgresql/sqlc"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/views"
+)
+
+templ SupplierPage(suppliers []repo.Supplier, query string, sortBy string) {
+	@views.Base("Master Supplier", "suppliers") {
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+				<div>
+					<h1 class="text-3xl font-bold text-[#1D1D1F] tracking-tight">Data Supplier</h1>
+					<p class="text-sm text-[#8E8E93] mt-1">Kelola data vendor pemasok barang dan riwayat kontak pesanan</p>
+				</div>
+				<a href="/suppliers/new" class="bg-[#007AFF] text-white px-5 min-h-[44px] rounded-xl font-medium inline-flex items-center gap-2 hover:bg-[#0066D6] transition shadow-xs self-start sm:self-auto">
+					+ Tambah Supplier
+				</a>
+			</div>
+			<div class="flex flex-col sm:flex-row gap-3 mb-4 items-center justify-between">
+				<div class="relative w-full sm:w-80">
+					<input
+						type="text"
+						name="q"
+						value={ query }
+						placeholder="Cari nama, telepon, atau alamat supplier..."
+						class="w-full pl-10 pr-4 min-h-[44px] bg-white border border-[#E5E5EA] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/suppliers"
+						hx-target="#supplier-table-container"
+						hx-swap="outerHTML"
+						hx-trigger="keyup changed delay:300ms, search"
+						hx-include="[name='sort']"
+					/>
+					<svg class="w-5 h-5 text-[#8E8E93] absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+				</div>
+				<div class="flex items-center gap-2 text-sm text-[#8E8E93] w-full sm:w-auto justify-end">
+					<span>Urutkan:</span>
+					<select
+						name="sort"
+						class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/suppliers"
+						hx-target="#supplier-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q']"
+					>
+						<option value="name_asc" selected?={ sortBy == "name_asc" }>Nama (A-Z)</option>
+						<option value="name_desc" selected?={ sortBy == "name_desc" }>Nama (Z-A)</option>
+						<option value="newest" selected?={ sortBy == "newest" }>Terbaru</option>
+					</select>
+				</div>
+			</div>
+			@SupplierTable(suppliers)
+		</div>
+	}
+}
+
+templ CreateSupplierPage() {
+	@views.Base("Tambah Supplier", "suppliers") {
+		<div class="max-w-md mx-4 sm:mx-auto py-8">
+			<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8">
+				<div class="flex items-center gap-3 mb-6">
+					<a href="/suppliers" class="min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition">
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+					</a>
+					<div>
+						<h2 class="text-2xl font-bold text-[#1D1D1F]">Tambah Supplier Baru</h2>
+						<p class="text-sm text-[#8E8E93] mt-0.5">Catat informasi vendor atau distributor barang</p>
+					</div>
+				</div>
+				<form hx-post="/suppliers" class="space-y-5">
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Nama Supplier / Toko Grosir <span class="text-[#FF3B30]">*</span></label>
+						<input class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition capitalize" type="text" name="name" placeholder="Misal: PT Sinar Dunia" required/>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">No. Telepon / WhatsApp (Opsional)</label>
+						<input class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition" type="text" name="phone" placeholder="Misal: 08123456789"/>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Alamat / Keterangan (Opsional)</label>
+						<textarea class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 py-3 outline-none focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition" name="address" rows="3" placeholder="Misal: Pasar Pagi Blok A No. 12"></textarea>
+					</div>
+					<div class="pt-4">
+						<button type="submit" class="bg-[#007AFF] text-white px-4 min-h-[48px] rounded-xl font-semibold w-full hover:bg-[#0066D6] transition shadow-xs">
+							Simpan Supplier
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
+
+templ EditSupplierPage(s repo.Supplier) {
+	@views.Base("Ubah Supplier", "suppliers") {
+		<div class="max-w-md mx-4 sm:mx-auto py-8">
+			<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8">
+				<div class="flex items-center gap-3 mb-6">
+					<a href="/suppliers" class="min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition">
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+					</a>
+					<div>
+						<h2 class="text-2xl font-bold text-[#1D1D1F]">Ubah Supplier</h2>
+						<p class="text-sm text-[#8E8E93] mt-0.5">Perbarui kontak dan alamat pemasok</p>
+					</div>
+				</div>
+				<form hx-put={ "/suppliers/" + fmt.Sprint(s.ID) } class="space-y-5">
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Nama Supplier / Toko Grosir <span class="text-[#FF3B30]">*</span></label>
+						<input class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition capitalize" type="text" name="name" value={ s.Name } required/>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">No. Telepon / WhatsApp</label>
+						<input class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[44px] outline-none focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition" type="text" name="phone" value={ s.Phone.String }/>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Alamat / Keterangan</label>
+						<textarea class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 py-3 outline-none focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition" name="address" rows="3">{ s.Address.String }</textarea>
+					</div>
+					<div class="pt-4">
+						<button type="submit" class="bg-[#007AFF] text-white px-4 min-h-[48px] rounded-xl font-semibold w-full hover:bg-[#0066D6] transition shadow-xs">
+							Simpan Perubahan
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
+
+templ SupplierTable(suppliers []repo.Supplier) {
+	<div id="supplier-table-container" class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] overflow-hidden mt-4">
+		<div class="overflow-x-auto">
+			<table class="w-full text-left border-collapse">
+			<thead class="bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]">
+				<tr>
+					<th class="px-6 py-3.5 font-medium w-16 text-right">No</th>
+					<th class="px-6 py-3.5 font-medium">Nama Supplier</th>
+					<th class="px-6 py-3.5 font-medium">Telepon</th>
+					<th class="px-6 py-3.5 font-medium">Alamat</th>
+					<th class="px-6 py-3.5 font-medium text-right">Aksi</th>
+				</tr>
+			</thead>
+			<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+				for i, s := range suppliers {
+					<tr class="hover:bg-[#F5F5F7]/50 transition">
+						<td class="px-6 py-3.5 text-[#8E8E93] text-right tabular-nums">{ fmt.Sprint(i + 1) }</td>
+						<td class="px-6 py-3.5 font-semibold text-[#1D1D1F]">{ s.Name }</td>
+						<td class="px-6 py-3.5 text-gray-600 tabular-nums">
+							if s.Phone.String != "" {
+								{ s.Phone.String }
+							} else {
+								<span class="text-[#8E8E93]">-</span>
+							}
+						</td>
+						<td class="px-6 py-3.5 text-gray-600">
+							if s.Address.String != "" {
+								{ s.Address.String }
+							} else {
+								<span class="text-[#8E8E93]">-</span>
+							}
+						</td>
+						<td class="px-6 py-3.5 text-right">
+							<div class="flex items-center justify-end gap-2">
+								<a
+									href={ templ.SafeURL(fmt.Sprintf("/suppliers/%d/edit", s.ID)) }
+									class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 rounded-xl transition"
+									title="Ubah Supplier"
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+										<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"></path>
+									</svg>
+								</a>
+								<button
+									type="button"
+									hx-delete={ fmt.Sprintf("/suppliers/%d", s.ID) }
+									hx-target="closest tr"
+									hx-swap="outerHTML"
+									hx-confirm="Yakin ingin menghapus supplier ini?"
+									class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#FF3B30]/10 text-[#FF3B30] hover:bg-[#FF3B30]/20 rounded-xl transition"
+									title="Hapus Supplier"
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+										<path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"></path>
+									</svg>
+								</button>
+							</div>
+						</td>
+					</tr>
+				}
+				if len(suppliers) == 0 {
+					<tr>
+						<td colspan="5" class="px-6 py-8 text-center text-[#8E8E93]">
+							Belum ada data supplier.
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+		</div>
+	</div>
+}

@@ -1,0 +1,1984 @@
+package products
+
+import (
+	"encoding/json"
+	"fmt"
+	repo "github.com/ELghazX/pos-toko-ubaidillah/internal/adapters/postgresql/sqlc"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/utils"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/views"
+	"strings"
+)
+
+templ SKUInput(val string) {
+	<input
+		class="w-full border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+		type="text"
+		name="sku"
+		id="sku-input"
+		value={ val }
+		placeholder="Scan barcode atau masukkan SKU..."
+		required
+		x-bind:readonly="skuType === 'label'"
+		:class="skuType === 'label' ? 'bg-[#E5E5EA]/60 cursor-not-allowed text-[#8E8E93]' : 'bg-white text-[#1D1D1F]'"
+	/>
+}
+
+type serializedProductUnit struct {
+	ID            int32  `json:"id"`
+	ProductID     int32  `json:"product_id"`
+	UnitName      string `json:"unit_name"`
+	ConversionQty int32  `json:"conversion_qty"`
+	Price         string `json:"price"`
+}
+
+func serializeProductUnitsJSON(units []repo.ListPOSProductUnitsRow) string {
+	list := make([]serializedProductUnit, 0, len(units))
+	for _, u := range units {
+		list = append(list, serializedProductUnit{
+			ID:            u.ID,
+			ProductID:     u.ProductID,
+			UnitName:      u.UnitName,
+			ConversionQty: u.ConversionQty,
+			Price:         utils.FormatRupiah(u.Price),
+		})
+	}
+	bytes, _ := json.Marshal(list)
+	return string(bytes)
+}
+
+templ ProductPage(data ProductPageData) {
+	@views.Base("Master Produk", "products") {
+		<div
+			class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+			x-data={ fmt.Sprintf(`{
+				syncing: false,
+				progress: 0,
+				currentProduct: '',
+				currentIndex: 0,
+				totalItems: 0,
+				isDone: false,
+				eventSource: null,
+				units: %s,
+				showPrintModal: false,
+				printItem: { id: 0, name: '', sku: '' },
+				printUnitId: 0,
+				printQty: 1,
+				printFormat: 'thermal',
+				showStockCardModal: false,
+				stockCardLoading: false,
+				stockCardData: null,
+				stockCardFilter: 'all',
+				openPrintModal(id, name, sku) {
+					this.printItem = { id: id, name: name, sku: sku };
+					let pUnits = this.getUnits(id);
+					this.printUnitId = pUnits.length > 0 ? pUnits[0].id : 0;
+					this.printQty = 1;
+					this.printFormat = 'thermal';
+					this.showPrintModal = true;
+				},
+				async openStockCardModal(id) {
+					this.showStockCardModal = true;
+					this.stockCardLoading = true;
+					this.stockCardData = null;
+					this.stockCardFilter = 'all';
+					try {
+						let res = await fetch('/products/' + id + '/stock-card');
+						if (res.ok) {
+							this.stockCardData = await res.json();
+						}
+					} catch (e) {
+						console.error(e);
+					} finally {
+						this.stockCardLoading = false;
+					}
+				},
+				get filteredStockEntries() {
+					if (!this.stockCardData || !this.stockCardData.entries) return [];
+					if (this.stockCardFilter === 'all') return this.stockCardData.entries;
+					return this.stockCardData.entries.filter(e => e.transaction_type === this.stockCardFilter);
+				},
+				getUnits(pId) {
+					return this.units.filter(u => u.product_id === pId);
+				},
+				submitPrint() {
+					let url = '/products/print-labels/preview?product_id=' + this.printItem.id + '&unit_id=' + this.printUnitId + '&qty=' + this.printQty + '&format=' + this.printFormat;
+					window.open(url, '_blank');
+					this.showPrintModal = false;
+				},
+				startStream() {
+					if (!confirm('Hitung ulang dan perbarui stok master barang dari riwayat inventory ledger?')) {
+						return;
+					}
+					this.syncing = true;
+					this.isDone = false;
+					this.progress = 0;
+					this.currentProduct = 'Mempersiapkan data produk...';
+					this.currentIndex = 0;
+					this.totalItems = 0;
+
+					if (this.eventSource) {
+						this.eventSource.close();
+					}
+
+					this.eventSource = new EventSource('/products/recalculate-stock-stream');
+
+					this.eventSource.onmessage = (event) => {
+						try {
+							const data = JSON.parse(event.data);
+							if (data.done) {
+								this.eventSource.close();
+								this.eventSource = null;
+								this.progress = 100;
+								this.isDone = true;
+								this.currentProduct = "Selesai! " + this.totalItems + " barang berhasil disinkronkan.";
+								
+								if (window.htmx) {
+									htmx.ajax('GET', window.location.pathname + window.location.search, {
+										target: '#product-table-container',
+										swap: 'outerHTML'
+									});
+								}
+
+								setTimeout(() => {
+									this.syncing = false;
+									this.isDone = false;
+									this.progress = 0;
+								}, 1800);
+								return;
+							}
+
+							if (data.error) {
+								this.eventSource.close();
+								this.eventSource = null;
+								alert('Gagal update stok: ' + data.error);
+								this.syncing = false;
+								return;
+							}
+
+							this.currentProduct = data.product_name;
+							this.currentIndex = data.index;
+							this.totalItems = data.total;
+							this.progress = data.percent;
+						} catch (e) {
+							console.error(e);
+						}
+					};
+
+					this.eventSource.onerror = (err) => {
+						console.error('SSE Error:', err);
+						if (this.eventSource) {
+							this.eventSource.close();
+							this.eventSource = null;
+						}
+						if (!this.isDone) {
+							this.syncing = false;
+						}
+					};
+				}
+			}`, serializeProductUnitsJSON(data.Units)) }
+		>
+			<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+				<div>
+					<h1 class="text-3xl font-bold text-[#1D1D1F] tracking-tight">Daftar Produk &amp; Jasa</h1>
+					<p class="text-sm text-[#8E8E93] mt-1">Kelola data produk, barcode, multi-satuan, dan stok gudang</p>
+				</div>
+				<div class="flex shrink-0 items-center gap-2.5">
+					<a
+						href="/stock-adjustments"
+						class="bg-white border border-[#E5E5EA] text-[#1D1D1F] px-4 min-h-[44px] inline-flex items-center gap-2 rounded-xl text-sm font-medium hover:bg-[#F5F5F7] transition shadow-xs"
+						title="Stok Opname &amp; Pemakaian Barang"
+					>
+						<svg class="w-4 h-4 text-[#007AFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+						<span>Stok Opname &amp; Pakai</span>
+					</a>
+					<a
+						href="/products/print-labels"
+						class="bg-white border border-[#E5E5EA] text-[#1D1D1F] px-4 min-h-[44px] inline-flex items-center gap-2 rounded-xl text-sm font-medium hover:bg-[#F5F5F7] transition shadow-xs"
+						title="Cetak Label Harga &amp; Barcode Rak Massal"
+					>
+						<svg class="w-4 h-4 text-[#007AFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+						<span>Cetak Label Rak</span>
+					</a>
+					<button
+						id="btn-sync-stock"
+						type="button"
+						@click="startStream()"
+						:disabled="syncing"
+						class="bg-white border border-[#E5E5EA] text-[#1D1D1F] px-4 min-h-[44px] inline-flex items-center gap-2 rounded-xl text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-60 disabled:cursor-not-allowed transition shadow-xs"
+						title="Hitung ulang stok dari inventory ledger"
+					>
+						<template x-if="!syncing">
+							<svg class="w-4 h-4 text-[#007AFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+						</template>
+						<template x-if="syncing">
+							<svg class="w-4 h-4 text-[#007AFF] animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+						</template>
+						<span x-text="syncing ? 'Menyinkronkan...' : 'Update Stok Ledger'">Update Stok Ledger</span>
+					</button>
+					<a href="/products/new" class="bg-[#007AFF] text-white px-5 min-h-[44px] inline-flex items-center rounded-xl font-medium hover:bg-[#0066D6] transition shadow-xs">
+						+ Tambah Produk
+					</a>
+				</div>
+			</div>
+			<div
+				x-show="syncing"
+				x-transition:enter="transition ease-out duration-200"
+				x-transition:enter-start="opacity-0 -translate-y-2"
+				x-transition:enter-end="opacity-100 translate-y-0"
+				x-transition:leave="transition ease-in duration-200"
+				x-transition:leave-start="opacity-100 translate-y-0"
+				x-transition:leave-end="opacity-0 -translate-y-2"
+				x-cloak
+				class="mb-5 p-4 bg-white rounded-2xl border border-[#E5E5EA] shadow-xs space-y-2.5"
+			>
+				<div class="flex items-center justify-between text-xs gap-3">
+					<div class="flex items-center gap-2 min-w-0">
+						<template x-if="!isDone">
+							<svg class="animate-spin h-4 w-4 text-[#007AFF] flex-shrink-0" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+						</template>
+						<template x-if="isDone">
+							<svg class="h-4 w-4 text-[#34C759] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+						</template>
+						<div class="min-w-0">
+							<span
+								class="font-semibold block truncate"
+								:class="isDone ? 'text-[#34C759]' : 'text-[#1D1D1F]'"
+								x-text="isDone ? currentProduct : 'Sedang mengupdate: ' + currentProduct"
+							></span>
+							<span
+								x-show="!isDone && totalItems > 0"
+								class="text-[#8E8E93] text-[11px] block mt-0.5 tabular-nums"
+								x-text="'Barang ke-' + currentIndex + ' dari ' + totalItems + ' total produk'"
+							></span>
+						</div>
+					</div>
+					<span class="font-mono font-semibold text-sm flex-shrink-0" :class="isDone ? 'text-[#34C759]' : 'text-[#007AFF]'" x-text="progress + '%'"></span>
+				</div>
+				<div class="w-full bg-[#F5F5F7] rounded-full h-2 overflow-hidden border border-[#E5E5EA]">
+					<div
+						class="h-2 rounded-full transition-all duration-150"
+						:class="isDone ? 'bg-[#34C759]' : 'bg-[#007AFF]'"
+						:style="'width: ' + progress + '%'"
+					></div>
+				</div>
+			</div>
+			if data.LowStockCount > 0 && data.StockFilter != "low_stock" {
+				<div class="mb-5 p-4 bg-[#FF9500]/10 border border-[#FF9500]/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
+					<div class="flex items-center gap-3 text-[#B26A00]">
+						<div class="w-8 h-8 rounded-full bg-[#FF9500]/20 flex items-center justify-center flex-shrink-0 text-[#FF9500]">
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+						</div>
+						<div>
+							<p class="font-bold text-[#1D1D1F]">Peringatan Stok Menipis</p>
+							<p class="text-xs text-[#8E8E93] mt-0.5">Ada <strong class="text-[#FF9500] font-semibold">{ fmt.Sprint(data.LowStockCount) } produk</strong> yang stoknya sudah di bawah batas minimum atau habis.</p>
+						</div>
+					</div>
+					<a
+						href="/products?stock_filter=low_stock"
+						class="px-4 min-h-[44px] inline-flex items-center justify-center bg-[#FF9500] hover:bg-[#E08500] text-white font-semibold rounded-xl text-xs transition text-center whitespace-nowrap shadow-xs"
+					>
+						Lihat Produk Menipis &rarr;
+					</a>
+				</div>
+			}
+			<div class="flex flex-col lg:flex-row gap-3 mb-4 items-stretch lg:items-center justify-between">
+				<div class="relative w-full lg:max-w-md">
+					<input
+						type="text"
+						name="q"
+						value={ data.Query }
+						placeholder="Cari nama atau SKU produk..."
+						class="w-full pl-10 pr-4 min-h-[44px] bg-white border border-[#E5E5EA] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/products"
+						hx-target="#product-table-container"
+						hx-swap="outerHTML"
+						hx-trigger="keyup changed delay:400ms, search"
+						hx-include="[name='category_id'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']"
+					/>
+					<svg class="w-5 h-5 text-[#8E8E93] absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+				</div>
+				<div class="flex flex-wrap justify-end gap-2.5 text-sm">
+					<select
+						name="category_id"
+						class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/products"
+						hx-target="#product-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']"
+					>
+						<option value="0" selected?={ data.CategoryID == 0 }>Semua Kategori</option>
+						for _, c := range data.Categories {
+							<option value={ fmt.Sprint(c.ID) } selected?={ data.CategoryID == c.ID }>{ c.Name }</option>
+						}
+					</select>
+					<select
+						name="type"
+						class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/products"
+						hx-target="#product-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='category_id'], [name='stock_filter'], [name='sort'], [name='limit']"
+					>
+						<option value="" selected?={ data.ProductType == "" }>Semua Tipe</option>
+						<option value="barang" selected?={ data.ProductType == "barang" }>Barang Fisik</option>
+						<option value="jasa" selected?={ data.ProductType == "jasa" }>Jasa / Layanan</option>
+					</select>
+					<select
+						name="stock_filter"
+						class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/products"
+						hx-target="#product-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='category_id'], [name='type'], [name='sort'], [name='limit']"
+					>
+						<option value="" selected?={ data.StockFilter == "" }>Semua Status Stok</option>
+						<option value="low_stock" selected?={ data.StockFilter == "low_stock" }>
+							Stok Menipis &amp; Habis
+							if data.LowStockCount > 0 {
+								({ fmt.Sprint(data.LowStockCount) })
+							}
+						</option>
+						<option value="out_of_stock" selected?={ data.StockFilter == "out_of_stock" }>Stok Habis (0)</option>
+						<option value="in_stock" selected?={ data.StockFilter == "in_stock" }>Stok Aman (&gt; Min)</option>
+						<option value="no_hpp" selected?={ data.StockFilter == "no_hpp" }>HPP Belum Diisi (Rp 0)</option>
+					</select>
+					<select
+						name="sort"
+						class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/products"
+						hx-target="#product-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='category_id'], [name='type'], [name='stock_filter'], [name='limit']"
+					>
+						<option value="newest" selected?={ data.SortBy == "newest" }>Urut: Terbaru</option>
+						<option value="name_asc" selected?={ data.SortBy == "name_asc" }>Nama (A-Z)</option>
+						<option value="name_desc" selected?={ data.SortBy == "name_desc" }>Nama (Z-A)</option>
+						<option value="stock_asc" selected?={ data.SortBy == "stock_asc" }>Stok Terendah</option>
+						<option value="stock_desc" selected?={ data.SortBy == "stock_desc" }>Stok Tertinggi</option>
+						<option value="price_asc" selected?={ data.SortBy == "price_asc" }>Harga Terendah</option>
+						<option value="price_desc" selected?={ data.SortBy == "price_desc" }>Harga Tertinggi</option>
+					</select>
+					<select
+						name="limit"
+						title="Jumlah Baris"
+						class="border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/products"
+						hx-target="#product-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='category_id'], [name='type'], [name='stock_filter'], [name='sort']"
+					>
+						<option value="10" selected?={ data.Limit == 10 }>10 / hal</option>
+						<option value="25" selected?={ data.Limit == 25 }>25 / hal</option>
+						<option value="50" selected?={ data.Limit == 50 }>50 / hal</option>
+						<option value="100" selected?={ data.Limit == 100 }>100 / hal</option>
+					</select>
+				</div>
+			</div>
+			@ProductTable(data)
+			<div
+				x-show="showPrintModal"
+				x-transition.opacity
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/50 backdrop-blur-xs"
+				@click.self="showPrintModal = false"
+			>
+				<div class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-md overflow-hidden p-6 space-y-4 my-auto sm:my-8">
+					<div class="flex items-center justify-between pb-3 border-b border-[#E5E5EA]">
+						<div class="flex items-center gap-2">
+							<div class="w-8 h-8 rounded-full bg-[#007AFF]/15 flex items-center justify-center text-[#007AFF]">
+								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+							</div>
+							<h3 class="font-bold text-[#1D1D1F]">Cetak Label Harga / Barcode</h3>
+						</div>
+						<button type="button" @click="showPrintModal = false" class="text-[#8E8E93] hover:text-[#1D1D1F] p-1 rounded-lg">
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<div class="space-y-3">
+						<div class="bg-[#F5F5F7] p-3 rounded-xl border border-[#E5E5EA]">
+							<p class="text-xs text-[#8E8E93]">Produk:</p>
+							<p class="text-sm font-bold text-[#1D1D1F]" x-text="printItem.name"></p>
+							<p class="text-xs font-mono text-[#8E8E93] mt-0.5" x-text="printItem.sku"></p>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-[#8E8E93] mb-1">Pilih Satuan &amp; Harga</label>
+							<select
+								x-model="printUnitId"
+								class="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-transparent rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-[#007AFF]"
+							>
+								<template x-for="u in getUnits(printItem.id)" :key="u.id">
+									<option :value="u.id" x-text="u.unit_name + ' (Rp ' + u.price + ')'"></option>
+								</template>
+							</select>
+						</div>
+						<div class="grid grid-cols-2 gap-3">
+							<div>
+								<label class="block text-xs font-semibold text-[#8E8E93] mb-1">Jumlah Kopi Label</label>
+								<input
+									type="number"
+									min="1"
+									max="100"
+									x-model="printQty"
+									class="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-transparent rounded-xl text-sm font-semibold tabular-nums outline-none focus:bg-white focus:border-[#007AFF]"
+								/>
+							</div>
+							<div>
+								<label class="block text-xs font-semibold text-[#8E8E93] mb-1">Format Kertas</label>
+								<select
+									x-model="printFormat"
+									class="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-transparent rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-[#007AFF]"
+								>
+									<option value="thermal">Roll Thermal (50x30mm)</option>
+									<option value="a4">Lembaran A4 (Grid)</option>
+								</select>
+							</div>
+						</div>
+					</div>
+					<div class="flex gap-2 pt-2 border-t border-[#E5E5EA]">
+						<button
+							type="button"
+							@click="showPrintModal = false"
+							class="flex-1 py-2.5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] text-xs font-semibold hover:bg-black/5 transition"
+						>
+							Batal
+						</button>
+						<button
+							type="button"
+							@click="submitPrint()"
+							class="flex-1 py-2.5 rounded-xl bg-[#007AFF] hover:bg-[#0066D6] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
+						>
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+							<span>Preview &amp; Cetak</span>
+						</button>
+					</div>
+				</div>
+			</div>
+			<div
+				x-show="showStockCardModal"
+				x-transition.opacity
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/40 backdrop-blur-xs"
+				@click.self="showStockCardModal = false"
+			>
+				<div class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-3xl overflow-hidden p-6 space-y-4 max-h-[90vh] flex flex-col my-auto sm:my-8">
+					<div class="flex items-center justify-between pb-3 border-b border-[#E5E5EA] flex-shrink-0">
+						<div class="flex items-center gap-3 min-w-0">
+							<div class="w-9 h-9 rounded-xl bg-[#007AFF]/10 flex items-center justify-center text-[#007AFF] flex-shrink-0">
+								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z"></path></svg>
+							</div>
+							<div class="min-w-0">
+								<h3 class="font-bold text-[#1D1D1F] text-base truncate" x-text="stockCardData ? 'Kartu Stok: ' + stockCardData.name : 'Kartu Stok / Riwayat Mutasi'"></h3>
+								<p class="text-xs text-[#8E8E93] font-mono mt-0.5" x-show="stockCardData" x-text="stockCardData ? (stockCardData.sku + ' • HPP: Rp ' + stockCardData.average_cost + ' / ' + stockCardData.base_unit) : ''"></p>
+							</div>
+						</div>
+						<button type="button" @click="showStockCardModal = false" class="min-w-[36px] min-h-[36px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 rounded-xl transition">
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<div class="overflow-y-auto flex-1 space-y-4 pr-1 text-xs">
+						<template x-if="stockCardLoading">
+							<div class="py-12 text-center text-[#8E8E93]">
+								<svg class="w-6 h-6 animate-spin mx-auto text-[#007AFF] mb-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+								<span>Memuat riwayat mutasi stok...</span>
+							</div>
+						</template>
+						<template x-if="stockCardData">
+							<div class="space-y-4">
+								<div class="grid grid-cols-3 gap-3 p-3.5 bg-[#F5F5F7] rounded-xl border border-[#E5E5EA] text-center">
+									<div>
+										<span class="text-[#8E8E93] block text-[11px]">Stok Fisik Saat Ini</span>
+										<span class="font-bold text-[#1D1D1F] text-sm tabular-nums" x-text="stockCardData.current_stock + ' ' + stockCardData.base_unit"></span>
+									</div>
+									<div>
+										<span class="text-[#8E8E93] block text-[11px]">Total Masuk (+)</span>
+										<span class="font-bold text-[#34C759] text-sm tabular-nums" x-text="'+' + stockCardData.total_in + ' ' + stockCardData.base_unit"></span>
+									</div>
+									<div>
+										<span class="text-[#8E8E93] block text-[11px]">Total Keluar (-)</span>
+										<span class="font-bold text-[#FF3B30] text-sm tabular-nums" x-text="'-' + stockCardData.total_out + ' ' + stockCardData.base_unit"></span>
+									</div>
+								</div>
+								<div class="flex flex-wrap items-center justify-between gap-2">
+									<div class="flex flex-wrap items-center gap-1.5">
+										<button
+											type="button"
+											@click="stockCardFilter = 'all'"
+											:class="stockCardFilter === 'all' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'"
+											class="px-3 min-h-[34px] rounded-lg font-semibold text-xs transition"
+										>
+											Semua
+										</button>
+										<button
+											type="button"
+											@click="stockCardFilter = 'pembelian'"
+											:class="stockCardFilter === 'pembelian' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'"
+											class="px-3 min-h-[34px] rounded-lg font-semibold text-xs transition"
+										>
+											Pembelian Masuk
+										</button>
+										<button
+											type="button"
+											@click="stockCardFilter = 'penjualan'"
+											:class="stockCardFilter === 'penjualan' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'"
+											class="px-3 min-h-[34px] rounded-lg font-semibold text-xs transition"
+										>
+											Penjualan POS
+										</button>
+										<button
+											type="button"
+											@click="stockCardFilter = 'opname'"
+											:class="stockCardFilter === 'opname' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'"
+											class="px-3 min-h-[34px] rounded-lg font-semibold text-xs transition"
+										>
+											Opname &amp; Stok Awal
+										</button>
+										<button
+											type="button"
+											@click="stockCardFilter = 'pemakaian'"
+											:class="stockCardFilter === 'pemakaian' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'"
+											class="px-3 min-h-[34px] rounded-lg font-semibold text-xs transition"
+										>
+											Pemakaian / Rusak
+										</button>
+										<button
+											type="button"
+											@click="stockCardFilter = 'retur_batal'"
+											:class="stockCardFilter === 'retur_batal' ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'"
+											class="px-3 min-h-[34px] rounded-lg font-semibold text-xs transition"
+										>
+											Retur / Void
+										</button>
+									</div>
+									<span class="text-[11px] text-[#8E8E93] tabular-nums" x-text="filteredStockEntries.length + ' catatan mutasi'"></span>
+								</div>
+								<div class="border border-[#E5E5EA] rounded-xl overflow-x-auto">
+									<table class="w-full text-left border-collapse">
+										<thead class="bg-[#F5F5F7]/70 border-b border-[#E5E5EA] text-[#8E8E93] font-medium text-xs">
+											<tr>
+												<th class="px-4 py-2.5">Waktu</th>
+												<th class="px-4 py-2.5">Jenis Mutasi</th>
+												<th class="px-4 py-2.5">Keterangan / Referensi</th>
+												<th class="px-4 py-2.5 text-right">Mutasi</th>
+												<th class="px-4 py-2.5 text-right">Saldo Akhir</th>
+											</tr>
+										</thead>
+										<tbody class="divide-y divide-[#E5E5EA] text-xs">
+											<template x-for="item in filteredStockEntries" :key="item.id">
+												<tr class="hover:bg-[#F5F5F7]/40 transition">
+													<td class="px-4 py-2.5 text-[#8E8E93] tabular-nums whitespace-nowrap" x-text="item.date_formatted"></td>
+													<td class="px-4 py-2.5 whitespace-nowrap">
+														<span
+															class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold"
+															:class="{
+																'bg-[#34C759]/15 text-[#248A3D]': item.transaction_type === 'pembelian',
+																'bg-[#007AFF]/15 text-[#007AFF]': item.transaction_type === 'penjualan',
+																'bg-[#FF9500]/15 text-[#B26A00]': item.transaction_type === 'pemakaian',
+																'bg-[#5856D6]/15 text-[#5856D6]': item.transaction_type === 'opname',
+																'bg-[#FF3B30]/15 text-[#FF3B30]': item.transaction_type === 'retur_batal'
+															}"
+															x-text="item.transaction_type === 'pembelian' ? 'Pembelian' : (item.transaction_type === 'penjualan' ? 'Penjualan' : (item.transaction_type === 'pemakaian' ? 'Pemakaian / Keluar' : (item.transaction_type === 'retur_batal' ? 'Retur / Batal' : ((item.notes && (item.notes.startsWith('Stok awal') || item.notes.startsWith('Saldo awal'))) ? 'Stok Awal' : 'Stok Opname'))))"
+														></span>
+													</td>
+													<td class="px-4 py-2.5 text-[#1D1D1F]">
+														<template x-if="item.reference_url">
+															<a :href="item.reference_url" class="text-[#007AFF] hover:underline font-medium" x-text="item.notes || '-'"></a>
+														</template>
+														<template x-if="!item.reference_url">
+															<span x-text="item.notes || '-'"></span>
+														</template>
+													</td>
+													<td
+														class="px-4 py-2.5 text-right font-bold tabular-nums whitespace-nowrap"
+														:class="item.qty_change > 0 ? 'text-[#34C759]' : (item.qty_change < 0 ? 'text-[#FF3B30]' : 'text-[#8E8E93]')"
+														x-text="(item.qty_change > 0 ? '+' : '') + item.qty_change + ' ' + stockCardData.base_unit"
+													></td>
+													<td class="px-4 py-2.5 text-right font-bold text-[#1D1D1F] tabular-nums whitespace-nowrap" x-text="item.balance_after + ' ' + stockCardData.base_unit"></td>
+												</tr>
+											</template>
+											<template x-if="filteredStockEntries.length === 0">
+												<tr>
+													<td colspan="5" class="px-4 py-8 text-center text-[#8E8E93]">Belum ada riwayat mutasi stok untuk filter ini.</td>
+												</tr>
+											</template>
+										</tbody>
+									</table>
+								</div>
+							</div>
+						</template>
+					</div>
+					<div class="pt-3 border-t border-[#E5E5EA] flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
+						<div class="flex items-center gap-2" x-show="stockCardData && stockCardData.type === 'barang'">
+							<a
+								:href="stockCardData ? ('/stock-adjustments?mode=opname&product_id=' + stockCardData.product_id) : '/stock-adjustments'"
+								class="min-h-[40px] px-3.5 rounded-xl bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 font-semibold text-xs inline-flex items-center gap-1.5 transition"
+							>
+								<span>Stok Opname</span>
+							</a>
+							<a
+								:href="stockCardData ? ('/stock-adjustments?mode=pemakaian&product_id=' + stockCardData.product_id) : '/stock-adjustments'"
+								class="min-h-[40px] px-3.5 rounded-xl bg-[#FF9500]/15 text-[#B26A00] hover:bg-[#FF9500]/25 font-semibold text-xs inline-flex items-center gap-1.5 transition"
+							>
+								<span>Catat Pemakaian / Rusak</span>
+							</a>
+						</div>
+						<button
+							type="button"
+							@click="showStockCardModal = false"
+							class="min-h-[40px] px-5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-semibold text-xs hover:bg-[#F5F5F7] transition ml-auto"
+						>
+							Tutup
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ CreateProductPage(categories []repo.Category) {
+	@views.Base("Tambah Produk", "products") {
+		<div class="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+			<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8">
+				<div class="flex items-center gap-3 mb-6">
+					<a href="/products" class="min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition">
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+					</a>
+					<div>
+						<h2 class="text-2xl font-bold text-[#1D1D1F] tracking-tight">Tambah Produk Baru</h2>
+						<p class="text-sm text-[#8E8E93]">Lengkapi detail informasi produk, barcode, dan satuan jual</p>
+					</div>
+				</div>
+				<form hx-post="/products" class="space-y-5">
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Kategori</label>
+						<select name="category_id" class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition">
+							for _, c := range categories {
+								<option value={ fmt.Sprint(c.ID) }>{ c.Name }</option>
+							}
+						</select>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Nama Produk / Jasa</label>
+						<input id="name_input" type="text" name="name" placeholder="Misal: Indomie Goreng Spesial" class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] capitalize focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition" required/>
+					</div>
+					<div
+						x-data="{ skuType: 'barcode' }"
+						class="p-4 bg-[#F5F5F7]/70 rounded-2xl border border-[#E5E5EA] space-y-3"
+					>
+						<label class="block text-sm font-medium text-[#1D1D1F]">SKU atau Barcode</label>
+						<select
+							x-model="skuType"
+							@change="if($event.target.value === 'barcode') { document.getElementById('sku-input').value = ''; $nextTick(() => { document.getElementById('sku-input').focus() }); }"
+							class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+						>
+							<option value="barcode">Barcode (Scan dari Kemasan Pabrik)</option>
+							<option value="label">Buat Label Otomatis (Generate SKU Toko)</option>
+						</select>
+						<div class="flex gap-2.5 items-center">
+							@SKUInput("")
+							<button
+								type="button"
+								x-show="skuType === 'label'"
+								hx-get="/products/generate-sku"
+								hx-include="[name='category_id']"
+								hx-target="#sku-input"
+								hx-swap="outerHTML"
+								class="bg-[#1D1D1F] text-white px-4 min-h-[44px] rounded-xl font-medium text-sm whitespace-nowrap hover:bg-black transition shadow-xs"
+							>
+								Generate
+							</button>
+						</div>
+					</div>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Tipe Barang</label>
+							<select name="type" class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition">
+								<option value="barang">Barang Fisik (Lacak Stok)</option>
+								<option value="jasa">Jasa / Layanan (Tanpa Stok)</option>
+							</select>
+						</div>
+						<div class="flex items-center sm:pt-6">
+							<label class="inline-flex items-center gap-2.5 cursor-pointer min-h-[44px]">
+								<input type="checkbox" name="is_open_price" class="form-checkbox h-5 w-5 text-[#007AFF] rounded border-[#E5E5EA] focus:ring-[#007AFF]"/>
+								<span class="text-sm font-medium text-[#1D1D1F]">Harga Fleksibel (Nego/Open Price)</span>
+							</label>
+						</div>
+					</div>
+					<div
+						x-data="{
+							units: [{ unit_name: '', step_qty: 1, price: '' }],
+							stockQty: 0,
+							stockUnitIdx: 0,
+							totalConvToBase(idx) {
+								let total = 1;
+								for (let i = idx + 1; i < this.units.length; i++) {
+									let q = parseInt(this.units[i].step_qty) || 1;
+									if (q < 1) q = 1;
+									total *= q;
+								}
+								return total;
+							},
+							smallestUnitName() {
+								let last = this.units[this.units.length - 1];
+								return (last && last.unit_name) ? last.unit_name : 'Satuan Terkecil';
+							}
+						}"
+						class="space-y-4 border-t border-[#E5E5EA] pt-6 mt-6"
+					>
+						<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+							<div>
+								<h3 class="font-bold text-[#1D1D1F]">Manajemen Satuan &amp; Harga (Terbesar ke Terkecil)</h3>
+								<p class="text-xs text-[#8E8E93] mt-0.5">Urutkan dari kemasan paling besar (misal: Dus &rarr; Pack &rarr; Pcs). Baris paling bawah otomatis menjadi satuan terkecil (Dasar = 1).</p>
+							</div>
+							<button
+								type="button"
+								@click="units.unshift({ unit_name: '', step_qty: 1, price: '' }); stockUnitIdx++;"
+								class="self-start sm:self-auto border border-[#007AFF] text-[#007AFF] hover:bg-[#007AFF]/10 transition rounded-xl px-3 py-1.5 min-h-[38px] font-semibold text-xs flex items-center gap-1.5 shadow-2xs"
+							>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+								<span>Tambah Satuan Lebih Besar (Di Atas)</span>
+							</button>
+						</div>
+						<template x-for="(unit, index) in units" :key="index">
+							<div
+								class="p-4 rounded-2xl border transition-all space-y-3"
+								:class="index === units.length - 1 ? 'bg-[#007AFF]/5 border-[#007AFF]/30' : 'bg-[#F5F5F7] border-[#E5E5EA]'"
+							>
+								<div class="flex items-center justify-between">
+									<div class="flex items-center gap-2">
+										<span
+											class="text-xs font-semibold px-2.5 py-1 rounded-md"
+											:class="index === units.length - 1 ? 'bg-[#007AFF] text-white' : 'bg-white text-[#1D1D1F] border border-[#E5E5EA]'"
+											x-text="units.length === 1 ? 'Satuan Dasar (Konversi = 1)' : (index === 0 ? '1. Satuan Terbesar' : (index === units.length - 1 ? (index + 1) + '. Satuan Terkecil (Dasar = 1)' : (index + 1) + '. Satuan Turunan'))"
+										></span>
+										<span
+											x-show="index < units.length - 1"
+											class="text-xs font-medium text-[#007AFF] bg-[#007AFF]/10 px-2 py-0.5 rounded-md"
+											x-text="'1 ' + (unit.unit_name || '...') + ' = ' + totalConvToBase(index) + ' ' + smallestUnitName()"
+										></span>
+									</div>
+									<button
+										type="button"
+										x-show="units.length > 1"
+										@click="units.splice(index, 1); if (stockUnitIdx >= units.length) stockUnitIdx = units.length - 1;"
+										class="text-[#FF3B30] hover:bg-[#FF3B30]/10 px-2.5 py-1 min-h-[36px] rounded-lg transition text-xs font-medium flex items-center gap-1"
+										title="Hapus Satuan"
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+											<path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"></path>
+										</svg>
+										<span>Hapus</span>
+									</button>
+								</div>
+								<div class="grid grid-cols-12 gap-3 items-end">
+									<div :class="index === 0 ? 'col-span-12 sm:col-span-6' : 'col-span-12 sm:col-span-4'">
+										<label class="block text-xs font-medium text-[#8E8E93] mb-1">Nama Satuan</label>
+										<input
+											type="text"
+											name="unit_names[]"
+											x-model="unit.unit_name"
+											:placeholder="index === 0 && units.length > 1 ? 'Misal: Dus' : (index === units.length - 1 ? 'Misal: Pcs' : 'Misal: Pack')"
+											class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] capitalize focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+											maxlength="15"
+											required
+										/>
+									</div>
+									<template x-if="index === 0">
+										<input type="hidden" name="step_qtys[]" value="1"/>
+									</template>
+									<template x-if="index > 0">
+										<div class="col-span-12 sm:col-span-4">
+											<label class="block text-xs font-medium text-[#8E8E93] mb-1 truncate" x-text="'1 ' + (units[index-1].unit_name || 'Satuan Atas') + ' isi berapa ' + (unit.unit_name || 'ini') + '?'"></label>
+											<input
+												type="number"
+												min="1"
+												name="step_qtys[]"
+												x-model="unit.step_qty"
+												placeholder="Misal: 12"
+												class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+												required
+											/>
+										</div>
+									</template>
+									<div :class="index === 0 ? 'col-span-12 sm:col-span-6' : 'col-span-12 sm:col-span-4'">
+										<label class="block text-xs font-medium text-[#8E8E93] mb-1" x-text="'Harga Jual per ' + (unit.unit_name || 'Satuan')"></label>
+										<input
+											type="number"
+											name="prices[]"
+											x-model="unit.price"
+											placeholder="Misal: 15000"
+											class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+											required
+										/>
+									</div>
+								</div>
+							</div>
+						</template>
+						<button
+							type="button"
+							@click="units.push({ unit_name: '', step_qty: 1, price: '' })"
+							class="w-full border-2 border-dashed border-[#E5E5EA] text-[#8E8E93] hover:border-[#007AFF] hover:text-[#007AFF] hover:bg-[#007AFF]/5 transition rounded-2xl py-3.5 min-h-[48px] font-medium flex items-center justify-center gap-2 text-sm"
+						>
+							<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+							<span>Tambah Satuan Lebih Kecil / Eceran (Di Bawahnya)</span>
+						</button>
+						<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-[#E5E5EA] pt-6">
+							<div>
+								<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Stok Awal Fisik</label>
+								<div class="flex gap-2">
+									<input
+										type="number"
+										name="initial_stock"
+										x-model="stockQty"
+										min="0"
+										class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+										value="0"
+										required
+									/>
+									<select
+										name="initial_stock_unit_idx"
+										x-model="stockUnitIdx"
+										class="bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm font-medium text-[#1D1D1F] min-w-[100px] focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+									>
+										<template x-for="(u, idx) in units" :key="idx">
+											<option :value="idx" x-text="u.unit_name ? u.unit_name : 'Satuan #' + (idx + 1)"></option>
+										</template>
+									</select>
+								</div>
+								<p class="text-xs text-[#007AFF] font-medium mt-1.5" x-text="'Total: ' + ((parseInt(stockQty) || 0) * totalConvToBase(parseInt(stockUnitIdx) || 0)) + ' ' + smallestUnitName()"></p>
+							</div>
+							<div>
+								<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">
+									Harga Modal / HPP <span class="text-xs font-normal text-[#8E8E93]">(Opsional)</span>
+								</label>
+								<input type="number" name="average_cost" min="0" placeholder="Kosongkan / 0 jika belum tahu" class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition" value="0"/>
+								<p class="text-xs text-[#8E8E93] mt-1.5" x-text="'Per ' + smallestUnitName() + ' (otomatis ikut harga beli saat kulakan jika 0)'"></p>
+							</div>
+							<div>
+								<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">
+									Batas Min. Stok (Alert)
+								</label>
+								<input type="number" name="min_stock" min="0" placeholder="Misal: 5" class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition" value="15" required/>
+								<p class="text-xs text-[#8E8E93] mt-1.5" x-text="'Peringatan jika &le; batas (' + smallestUnitName() + ')'"></p>
+							</div>
+						</div>
+					</div>
+					<div class="pt-4 flex justify-end gap-3">
+						<a
+							href="/products"
+							class="flex-1 sm:flex-none px-5 min-h-[44px] inline-flex items-center justify-center rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-medium hover:bg-[#F5F5F7] transition"
+						>
+							Batal
+						</a>
+						<button type="submit" class="flex-1 sm:flex-none bg-[#007AFF] hover:bg-[#0066D6] text-white px-6 min-h-[44px] rounded-xl font-semibold transition shadow-xs inline-flex items-center justify-center">
+							Simpan Produk
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
+
+templ ProductTable(data ProductPageData) {
+	<div id="product-table-container" class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] overflow-hidden mt-4">
+		<div class="overflow-x-auto">
+			<table class="w-full text-left border-collapse">
+				<thead class="bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]">
+					<tr>
+						<th class="px-6 py-3.5 font-medium">Kategori</th>
+						<th class="px-6 py-3.5 font-medium">SKU</th>
+						<th class="px-6 py-3.5 font-medium">Nama Produk</th>
+						<th class="px-6 py-3.5 font-medium text-right">Stok</th>
+						<th class="px-6 py-3.5 font-medium">Satuan</th>
+						<th class="px-6 py-3.5 font-medium text-right">HPP (Modal)</th>
+						<th class="px-6 py-3.5 font-medium text-right">Harga Jual</th>
+						<th class="px-6 py-3.5 font-medium text-right">Aksi</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+					for _, p := range data.Products {
+						<tr class="hover:bg-[#F5F5F7]/50 transition">
+							<td class="px-6 py-3.5 text-gray-600">{ p.CategoryName.String }</td>
+							<td class="px-6 py-3.5 font-mono text-gray-700">{ p.Sku }</td>
+							<td class="px-6 py-3.5 font-medium text-[#1D1D1F]">
+								{ p.ProductName }
+								<span class="text-xs text-[#8E8E93] bg-[#F5F5F7] px-2 py-0.5 ml-2 rounded-md border border-[#E5E5EA]">{ p.Type }</span>
+							</td>
+							<td class="px-6 py-3.5 text-right">
+								if p.Type == "barang" && p.CurrentStock <= 0 {
+									<div class="inline-flex flex-col items-end">
+										<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FF3B30]/15 text-[#FF3B30]">
+											<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+											Habis (0)
+										</span>
+										<span class="text-[11px] text-[#8E8E93] mt-0.5 tabular-nums">Min: { fmt.Sprint(p.MinStock) }</span>
+									</div>
+								} else if p.Type == "barang" && p.CurrentStock <= p.MinStock {
+									<div class="inline-flex flex-col items-end">
+										<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FF9500]/15 text-[#FF9500]">
+											<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+											{ fmt.Sprint(p.CurrentStock) } (Menipis)
+										</span>
+										<span class="text-[11px] text-[#8E8E93] mt-0.5 tabular-nums">Min: { fmt.Sprint(p.MinStock) }</span>
+									</div>
+								} else if p.Type == "barang" {
+									<div class="text-right">
+										<span class="font-semibold tabular-nums text-[#1D1D1F]">{ fmt.Sprint(p.CurrentStock) }</span>
+										<span class="block text-[11px] text-[#8E8E93] mt-0.5 tabular-nums">Min: { fmt.Sprint(p.MinStock) }</span>
+									</div>
+								} else {
+									<span class="text-xs text-[#8E8E93] italic">Non-Stok</span>
+								}
+							</td>
+							<td class="px-6 py-3.5 text-gray-600">{ p.UnitName.String }</td>
+							<td class="px-6 py-3.5 text-right whitespace-nowrap">
+								if p.Type == "barang" {
+									if utils.NumericToFloat(p.AverageCost) <= 0 {
+										<a
+											href={ templ.SafeURL(fmt.Sprintf("/products/%d/edit", p.ProductID)) }
+											class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#FF9500]/15 text-[#B26A00] hover:bg-[#FF9500]/25 transition"
+											title="HPP belum diisi. Klik untuk mengisi atau akan otomatis terisi saat penerimaan barang."
+										>
+											<svg class="w-3.5 h-3.5 flex-shrink-0 text-[#FF9500]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+											<span>Belum Diisi</span>
+										</a>
+									} else if utils.NumericToFloat(p.Price) > 0 && utils.NumericToFloat(p.AverageCost) > utils.NumericToFloat(p.Price) {
+										<div class="inline-flex flex-col items-end">
+											<span class="font-medium text-[#FF3B30] tabular-nums">Rp { utils.FormatRupiah(p.AverageCost) }</span>
+											<span class="text-[10px] font-semibold text-[#FF3B30] bg-[#FF3B30]/10 px-1.5 py-0.5 rounded mt-0.5">HPP &gt; Harga Jual</span>
+										</div>
+									} else {
+										<span class="font-medium text-[#1D1D1F] tabular-nums">Rp { utils.FormatRupiah(p.AverageCost) }</span>
+									}
+								} else {
+									<span class="text-xs text-[#8E8E93] italic">-</span>
+								}
+							</td>
+							<td class="px-6 py-3.5 text-[#34C759] font-semibold text-right tabular-nums whitespace-nowrap">Rp { utils.FormatRupiah(p.Price) }</td>
+							<td class="px-6 py-3.5 text-right">
+								<div class="flex items-center justify-end gap-2">
+									if p.Type == "barang" {
+										<button
+											type="button"
+											@click={ fmt.Sprintf("openStockCardModal(%d)", p.ProductID) }
+											class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA] rounded-xl transition"
+											title="Kartu Stok / Riwayat Mutasi"
+										>
+											<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z"></path>
+											</svg>
+										</button>
+									}
+									<button
+										type="button"
+										data-id={ fmt.Sprint(p.ProductID) }
+										data-name={ p.ProductName }
+										data-sku={ p.Sku }
+										@click="openPrintModal(parseInt($el.dataset.id), $el.dataset.name, $el.dataset.sku)"
+										class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#34C759]/10 text-[#34C759] hover:bg-[#34C759]/20 rounded-xl transition"
+										title="Cetak Label Harga / Barcode"
+									>
+										<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+									</button>
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%d/edit", p.ProductID)) }
+										class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 rounded-xl transition"
+										title="Ubah Produk"
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+											<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"></path>
+										</svg>
+									</a>
+								</div>
+							</td>
+						</tr>
+					}
+					if len(data.Products) == 0 {
+						<tr>
+							<td colspan="8" class="px-6 py-8 text-center text-[#8E8E93]">
+								Tidak ada produk yang ditemukan.
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		if data.TotalPages > 1 {
+			<div class="px-6 py-4 border-t border-[#E5E5EA] flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left bg-[#F5F5F7]/50">
+				<div class="text-sm text-[#8E8E93] tabular-nums">
+					Menampilkan <span class="font-medium text-[#1D1D1F]">{ fmt.Sprint((data.Page - 1) * data.Limit + 1) }</span> sampai <span class="font-medium text-[#1D1D1F]">{ fmt.Sprint(min(data.Page * data.Limit, int(data.TotalRows))) }</span> dari <span class="font-medium text-[#1D1D1F]">{ fmt.Sprint(data.TotalRows) }</span> data
+				</div>
+				<div class="flex gap-2">
+					<button
+						class="px-4 min-h-[44px] border border-[#E5E5EA] rounded-xl bg-white text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-50 transition"
+						disabled?={ data.Page <= 1 }
+						hx-get={ string(templ.SafeURL(fmt.Sprintf("/products?page=%d", data.Page-1))) }
+						hx-target="#product-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='category_id'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']"
+					>
+						Sebelumnya
+					</button>
+					<button
+						class="px-4 min-h-[44px] border border-[#E5E5EA] rounded-xl bg-white text-sm font-medium hover:bg-[#F5F5F7] disabled:opacity-50 transition"
+						disabled?={ data.Page >= data.TotalPages }
+						hx-get={ string(templ.SafeURL(fmt.Sprintf("/products?page=%d", data.Page+1))) }
+						hx-target="#product-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='category_id'], [name='type'], [name='stock_filter'], [name='sort'], [name='limit']"
+					>
+						Selanjutnya
+					</button>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func getCascadingUnitsJSON(units []repo.ProductUnit) string {
+	if len(units) == 0 {
+		return `[{"unit_name":"","step_qty":1,"price":"0"}]`
+	}
+	var items []string
+	for i, u := range units {
+		stepQty := int32(1)
+		if i > 0 && u.ConversionQty > 0 {
+			stepQty = units[i-1].ConversionQty / u.ConversionQty
+			if stepQty < 1 {
+				stepQty = 1
+			}
+		}
+		items = append(items, fmt.Sprintf(`{"unit_name":"%s","step_qty":%d,"price":"%s"}`, u.UnitName, stepQty, utils.FormatPlainFloat(u.Price)))
+	}
+	return "[" + strings.Join(items, ",") + "]"
+}
+
+templ EditProductPage(product repo.Product, units []repo.ProductUnit, categories []repo.Category) {
+	@views.Base("Ubah Produk", "products") {
+		<div class="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+			<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8">
+				<div class="flex items-center gap-3 mb-6">
+					<a href="/products" class="min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition">
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+					</a>
+					<div>
+						<h2 class="text-2xl font-bold text-[#1D1D1F] tracking-tight">Ubah Produk</h2>
+						<p class="text-sm text-[#8E8E93]">Perbarui data produk, barcode, dan konfigurasi satuan</p>
+					</div>
+				</div>
+				<form hx-post={ string(templ.SafeURL(fmt.Sprintf("/products/%d/edit", product.ID))) } class="space-y-5">
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Kategori Barang</label>
+						<select name="category_id" class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition" required>
+							<option value="" disabled>-- Pilih Kategori --</option>
+							for _, c := range categories {
+								<option value={ fmt.Sprint(c.ID) } selected?={ c.ID == product.CategoryID }>{ c.Name }</option>
+							}
+						</select>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Nama Produk / Jasa</label>
+						<input type="text" name="name" value={ product.Name } class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] capitalize focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition" required/>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">SKU / Barcode</label>
+						<input
+							class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+							type="text"
+							name="sku"
+							value={ product.Sku }
+							required
+						/>
+						<p class="text-xs text-[#8E8E93] mt-1.5">Ubah hanya jika pabrik mengganti nomor barcode, atau jika ada salah scan.</p>
+					</div>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Tipe Barang</label>
+							<select name="type" class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition">
+								<option value="barang" selected?={ product.Type == "barang" }>Barang Fisik (Lacak Stok)</option>
+								<option value="jasa" selected?={ product.Type == "jasa" }>Jasa / Layanan (Tanpa Stok)</option>
+							</select>
+						</div>
+						<div class="flex items-center sm:pt-6">
+							<label class="inline-flex items-center gap-2.5 cursor-pointer min-h-[44px]">
+								<input type="checkbox" name="is_open_price" class="form-checkbox h-5 w-5 text-[#007AFF] rounded border-[#E5E5EA] focus:ring-[#007AFF]" checked?={ product.IsOpenPrice }/>
+								<span class="text-sm font-medium text-[#1D1D1F]">Harga Fleksibel (Nego)</span>
+							</label>
+						</div>
+					</div>
+					<div
+						x-data={ fmt.Sprintf(`{
+						units: %s,
+						totalConvToBase(idx) {
+							let total = 1;
+							for (let i = idx + 1; i < this.units.length; i++) {
+								let q = parseInt(this.units[i].step_qty) || 1;
+								if (q < 1) q = 1;
+								total *= q;
+							}
+							return total;
+						},
+						smallestUnitName() {
+							let last = this.units[this.units.length - 1];
+							return (last && last.unit_name) ? last.unit_name : 'Satuan Terkecil';
+						}
+					}`, getCascadingUnitsJSON(units)) }
+						class="space-y-4 border-t border-[#E5E5EA] pt-6 mt-6"
+					>
+						<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+							<div>
+								<h3 class="font-bold text-[#1D1D1F]">Manajemen Satuan &amp; Harga (Terbesar ke Terkecil)</h3>
+								<p class="text-xs text-[#8E8E93] mt-0.5">Urutkan dari kemasan paling besar ke paling kecil. Baris paling bawah otomatis menjadi satuan terkecil (Dasar = 1).</p>
+							</div>
+							<button
+								type="button"
+								@click="units.unshift({ unit_name: '', step_qty: 1, price: '' })"
+								class="self-start sm:self-auto border border-[#007AFF] text-[#007AFF] hover:bg-[#007AFF]/10 transition rounded-xl px-3 py-1.5 min-h-[38px] font-semibold text-xs flex items-center gap-1.5 shadow-2xs"
+							>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+								<span>Tambah Satuan Lebih Besar (Di Atas)</span>
+							</button>
+						</div>
+						<template x-for="(unit, index) in units" :key="index">
+							<div
+								class="p-4 rounded-2xl border transition-all space-y-3"
+								:class="index === units.length - 1 ? 'bg-[#007AFF]/5 border-[#007AFF]/30' : 'bg-[#F5F5F7] border-[#E5E5EA]'"
+							>
+								<div class="flex items-center justify-between">
+									<div class="flex items-center gap-2">
+										<span
+											class="text-xs font-semibold px-2.5 py-1 rounded-md"
+											:class="index === units.length - 1 ? 'bg-[#007AFF] text-white' : 'bg-white text-[#1D1D1F] border border-[#E5E5EA]'"
+											x-text="units.length === 1 ? 'Satuan Dasar (Konversi = 1)' : (index === 0 ? '1. Satuan Terbesar' : (index === units.length - 1 ? (index + 1) + '. Satuan Terkecil (Dasar = 1)' : (index + 1) + '. Satuan Turunan'))"
+										></span>
+										<span
+											x-show="index < units.length - 1"
+											class="text-xs font-medium text-[#007AFF] bg-[#007AFF]/10 px-2 py-0.5 rounded-md"
+											x-text="'1 ' + (unit.unit_name || '...') + ' = ' + totalConvToBase(index) + ' ' + smallestUnitName()"
+										></span>
+									</div>
+									<button
+										type="button"
+										x-show="units.length > 1"
+										@click="units.splice(index, 1)"
+										class="text-[#FF3B30] hover:bg-[#FF3B30]/10 px-2.5 py-1 min-h-[36px] rounded-lg transition text-xs font-medium flex items-center gap-1"
+										title="Hapus Satuan"
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+											<path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"></path>
+										</svg>
+										<span>Hapus</span>
+									</button>
+								</div>
+								<div class="grid grid-cols-12 gap-3 items-end">
+									<div :class="index === 0 ? 'col-span-12 sm:col-span-6' : 'col-span-12 sm:col-span-4'">
+										<label class="block text-xs font-medium text-[#8E8E93] mb-1">Nama Satuan</label>
+										<input
+											type="text"
+											name="unit_names[]"
+											x-model="unit.unit_name"
+											class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] capitalize focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+											maxlength="15"
+											required
+										/>
+									</div>
+									<template x-if="index === 0">
+										<input type="hidden" name="step_qtys[]" value="1"/>
+									</template>
+									<template x-if="index > 0">
+										<div class="col-span-12 sm:col-span-4">
+											<label class="block text-xs font-medium text-[#8E8E93] mb-1 truncate" x-text="'1 ' + (units[index-1].unit_name || 'Satuan Atas') + ' isi berapa ' + (unit.unit_name || 'ini') + '?'"></label>
+											<input
+												type="number"
+												min="1"
+												name="step_qtys[]"
+												x-model="unit.step_qty"
+												class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+												required
+											/>
+										</div>
+									</template>
+									<div :class="index === 0 ? 'col-span-12 sm:col-span-6' : 'col-span-12 sm:col-span-4'">
+										<label class="block text-xs font-medium text-[#8E8E93] mb-1" x-text="'Harga Jual per ' + (unit.unit_name || 'Satuan')"></label>
+										<input
+											type="number"
+											name="prices[]"
+											x-model="unit.price"
+											class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+											required
+										/>
+									</div>
+								</div>
+							</div>
+						</template>
+						<button
+							type="button"
+							@click="units.push({unit_name: '', step_qty: 1, price: ''})"
+							class="w-full border-2 border-dashed border-[#E5E5EA] text-[#8E8E93] hover:border-[#007AFF] hover:text-[#007AFF] hover:bg-[#007AFF]/5 transition rounded-2xl py-3.5 min-h-[48px] font-medium flex items-center justify-center gap-2 text-sm"
+						>
+							<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+							<span>Tambah Satuan Lebih Kecil / Eceran (Di Bawahnya)</span>
+						</button>
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[#E5E5EA] pt-6">
+							<div>
+								<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">
+									Harga Modal / HPP <span class="text-xs font-normal text-[#8E8E93]">(Opsional)</span>
+								</label>
+								<input type="number" name="average_cost" min="0" value={ utils.FormatPlainFloat(product.AverageCost) } placeholder="Kosongkan / 0 jika belum tahu" class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"/>
+								<p class="text-xs text-[#8E8E93] mt-1.5" x-text="'Per ' + smallestUnitName() + ' (otomatis ikut harga beli saat kulakan jika 0)'"></p>
+							</div>
+							<div>
+								<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">
+									Batas Min. Stok (Alert)
+								</label>
+								<input type="number" name="min_stock" min="0" value={ fmt.Sprint(product.MinStock) } class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-[#1D1D1F] tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition" required/>
+								<p class="text-xs text-[#8E8E93] mt-1.5" x-text="'Peringatan jika &le; batas (' + smallestUnitName() + ')'"></p>
+							</div>
+						</div>
+					</div>
+					<div class="pt-6 border-t border-[#E5E5EA] flex flex-col sm:flex-row items-center justify-between gap-4">
+						<button
+							type="button"
+							hx-delete={ fmt.Sprintf("/products/%d", product.ID) }
+							hx-confirm="Yakin ingin menghapus produk ini? Produk yang sudah memiliki riwayat transaksi akan dinonaktifkan."
+							class="w-full sm:w-auto px-4 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF3B30]/10 text-[#FF3B30] hover:bg-[#FF3B30]/20 font-semibold text-sm transition"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+								<path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"></path>
+							</svg>
+							<span>Hapus Produk</span>
+						</button>
+						<div class="flex items-center justify-end gap-3 w-full sm:w-auto">
+							<a
+								href="/products"
+								class="w-full sm:w-auto px-5 min-h-[44px] inline-flex items-center justify-center rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-medium hover:bg-[#F5F5F7] transition text-sm"
+							>
+								Batal
+							</a>
+							<button type="submit" class="w-full sm:w-auto bg-[#007AFF] hover:bg-[#0066D6] text-white px-6 min-h-[44px] rounded-xl font-semibold text-sm transition shadow-xs">
+								Simpan Perubahan
+							</button>
+						</div>
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
+
+type printLabelProductOption struct {
+	ID           int32  `json:"id"`
+	SKU          string `json:"sku"`
+	Name         string `json:"name"`
+	CategoryName string `json:"category_name"`
+	CurrentStock int32  `json:"current_stock"`
+}
+
+func serializePrintProductsJSON(products []repo.ListPOSProductsRow) string {
+	opts := make([]printLabelProductOption, 0, len(products))
+	for _, p := range products {
+		if p.Type == "barang" || p.Type == "" {
+			sku := p.Sku
+			if sku == "" {
+				sku = fmt.Sprintf("PRD%06d", p.ID)
+			}
+			opts = append(opts, printLabelProductOption{
+				ID:           p.ID,
+				SKU:          sku,
+				Name:         p.Name,
+				CategoryName: p.CategoryName,
+				CurrentStock: p.CurrentStock,
+			})
+		}
+	}
+	bytes, _ := json.Marshal(opts)
+	return string(bytes)
+}
+
+templ PrintLabelsPage(products []repo.ListPOSProductsRow, units []repo.ListPOSProductUnitsRow, categories []repo.Category, preselectedID int32) {
+	@views.Base("Cetak Label Rak", "print-labels") {
+		<div
+			class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+			x-data={ fmt.Sprintf(`{
+				products: %s,
+				units: %s,
+				preselectedID: %d,
+				format: 'thermal',
+				searchQuery: '',
+				dropdownOpen: false,
+				selectedItems: [],
+
+				get filteredProducts() {
+					if (!this.searchQuery.trim()) return this.products.slice(0, 30);
+					const q = this.searchQuery.toLowerCase().trim();
+					return this.products.filter(p =>
+						p.name.toLowerCase().includes(q) ||
+						p.sku.toLowerCase().includes(q) ||
+						(p.category_name && p.category_name.toLowerCase().includes(q))
+					).slice(0, 30);
+				},
+
+				getProductUnits(productId) {
+					return this.units.filter(u => u.product_id === productId);
+				},
+
+				addProduct(p) {
+					const existing = this.selectedItems.find(item => item.id === p.id);
+					if (existing) {
+						existing.qty += 1;
+					} else {
+						const pUnits = this.getProductUnits(p.id);
+						const defaultUnitId = pUnits.length > 0 ? pUnits[0].id : 0;
+						this.selectedItems.push({
+							id: p.id,
+							sku: p.sku,
+							name: p.name,
+							category_name: p.category_name,
+							unit_id: defaultUnitId,
+							qty: 1
+						});
+					}
+					this.searchQuery = '';
+					this.dropdownOpen = false;
+					this.$nextTick(() => {
+						if (this.$refs.searchInput) this.$refs.searchInput.focus();
+					});
+				},
+
+				onSearchEnter() {
+					const q = this.searchQuery.trim().toLowerCase();
+					if (!q) return;
+					const match = this.products.find(p => p.sku.toLowerCase() === q);
+					if (match) {
+						this.addProduct(match);
+						return;
+					}
+					const filtered = this.filteredProducts;
+					if (filtered.length > 0) {
+						this.addProduct(filtered[0]);
+					}
+				},
+
+				removeProduct(index) {
+					this.selectedItems.splice(index, 1);
+				},
+
+				clearAll() {
+					if (confirm('Kosongkan semua daftar cetak label?')) {
+						this.selectedItems = [];
+					}
+				},
+
+				totalCopies() {
+					return this.selectedItems.reduce((acc, item) => acc + (parseInt(item.qty) || 0), 0);
+				},
+
+				init() {
+					if (this.preselectedID > 0) {
+						const p = this.products.find(item => item.id === this.preselectedID);
+						if (p) {
+							this.addProduct(p);
+						}
+					}
+				},
+
+				submitForm() {
+					if (this.selectedItems.length === 0) {
+						alert('Silakan pilih minimal 1 produk untuk dicetak.');
+						return;
+					}
+					const form = document.createElement('form');
+					form.method = 'POST';
+					form.action = '/products/print-labels/preview';
+					form.target = '_blank';
+
+					const formatInput = document.createElement('input');
+					formatInput.type = 'hidden';
+					formatInput.name = 'format';
+					formatInput.value = this.format;
+					form.appendChild(formatInput);
+
+					this.selectedItems.forEach(item => {
+						if (item.qty > 0) {
+							const pInput = document.createElement('input');
+							pInput.type = 'hidden';
+							pInput.name = 'product_ids[]';
+							pInput.value = item.id;
+							form.appendChild(pInput);
+
+							const uInput = document.createElement('input');
+							uInput.type = 'hidden';
+							uInput.name = 'unit_ids[]';
+							uInput.value = item.unit_id || 0;
+							form.appendChild(uInput);
+
+							const qInput = document.createElement('input');
+							qInput.type = 'hidden';
+							qInput.name = 'qtys[]';
+							qInput.value = item.qty || 1;
+							form.appendChild(qInput);
+						}
+					});
+
+					document.body.appendChild(form);
+					form.submit();
+					document.body.removeChild(form);
+				}
+			}`, serializePrintProductsJSON(products), serializeProductUnitsJSON(units), preselectedID) }
+		>
+			<div class="mb-6">
+				<h1 class="text-3xl font-bold text-[#1D1D1F] tracking-tight">Cetak Label Harga &amp; Barcode Rak</h1>
+				<p class="text-sm text-[#8E8E93] mt-1">Pilih produk, satuan, dan jumlah lembar label harga rak toko atau barcode thermal roll</p>
+			</div>
+			<div class="bg-white rounded-2xl border border-[#E5E5EA] p-5 shadow-xs mb-6">
+				<div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-end">
+					<div class="lg:col-span-8 relative" @click.away="dropdownOpen = false">
+						<label class="block text-xs font-semibold text-[#8E8E93] mb-1.5 uppercase tracking-wider">
+							Cari &amp; Tambah Produk
+						</label>
+						<div class="relative">
+							<div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#8E8E93]">
+								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+							</div>
+							<input
+								x-ref="searchInput"
+								type="text"
+								x-model="searchQuery"
+								@focus="dropdownOpen = true"
+								@input="dropdownOpen = true"
+								@keydown.enter.prevent="onSearchEnter()"
+								@keydown.escape="dropdownOpen = false"
+								placeholder="Ketik nama produk, SKU, atau scan barcode lalu Enter..."
+								class="w-full pl-11 pr-16 min-h-[46px] bg-[#F5F5F7] border border-transparent rounded-xl text-sm text-[#1D1D1F] placeholder-[#8E8E93] outline-none focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition"
+								autocomplete="off"
+							/>
+							<div class="absolute inset-y-0 right-0 pr-3 flex items-center gap-1.5 text-xs text-[#8E8E93]">
+								<kbd class="px-1.5 py-0.5 bg-white border border-[#E5E5EA] rounded shadow-2xs font-mono text-[10px]">Enter</kbd>
+							</div>
+						</div>
+						<div
+							x-show="dropdownOpen"
+							x-transition:enter="transition ease-out duration-100"
+							x-transition:enter-start="opacity-0 scale-95"
+							x-transition:enter-end="opacity-100 scale-100"
+							x-transition:leave="transition ease-in duration-75"
+							x-transition:leave-start="opacity-100 scale-100"
+							x-transition:leave-end="opacity-0 scale-95"
+							class="absolute z-50 left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-[#E5E5EA] max-h-80 overflow-y-auto divide-y divide-[#F5F5F7]"
+							style="display: none;"
+						>
+							<template x-for="p in filteredProducts" :key="p.id">
+								<button
+									type="button"
+									@click="addProduct(p)"
+									class="w-full text-left px-4 py-3 hover:bg-[#F5F5F7] transition flex items-center justify-between gap-3 group"
+								>
+									<div class="min-w-0 flex-1">
+										<div class="flex items-center gap-2">
+											<span class="font-semibold text-sm text-[#1D1D1F] group-hover:text-[#007AFF] transition truncate" x-text="p.name"></span>
+											<span x-show="p.category_name" class="px-2 py-0.5 bg-[#F5F5F7] group-hover:bg-white text-[11px] font-medium text-[#8E8E93] rounded-md shrink-0" x-text="p.category_name"></span>
+										</div>
+										<div class="flex items-center gap-3 mt-0.5 text-xs text-[#8E8E93]">
+											<span class="font-mono" x-text="'SKU: ' + p.sku"></span>
+											<span>•</span>
+											<span x-text="'Stok: ' + p.current_stock"></span>
+										</div>
+									</div>
+									<span class="shrink-0 text-xs font-semibold text-[#007AFF] bg-[#007AFF]/10 px-2.5 py-1 rounded-lg group-hover:bg-[#007AFF] group-hover:text-white transition">
+										+ Tambah
+									</span>
+								</button>
+							</template>
+							<div x-show="filteredProducts.length === 0" class="px-4 py-8 text-center text-sm text-[#8E8E93]">
+								Tidak ada produk yang cocok dengan "<span x-text="searchQuery" class="font-semibold text-[#1D1D1F]"></span>"
+							</div>
+						</div>
+					</div>
+					<div class="lg:col-span-4">
+						<label class="block text-xs font-semibold text-[#8E8E93] mb-1.5 uppercase tracking-wider">
+							Ukuran / Format Cetak
+						</label>
+						<div class="grid grid-cols-2 gap-2 bg-[#F5F5F7] p-1 rounded-xl border border-[#E5E5EA]">
+							<button
+								type="button"
+								@click="format = 'thermal'"
+								:class="format === 'thermal' ? 'bg-white text-[#1D1D1F] shadow-xs font-semibold' : 'text-[#8E8E93] hover:text-[#1D1D1F] font-medium'"
+								class="min-h-[38px] py-1.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5"
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h10M7 11h10M7 15h6M4 4h16v16H4z"></path></svg>
+								<span>Thermal 50x30</span>
+							</button>
+							<button
+								type="button"
+								@click="format = 'a4'"
+								:class="format === 'a4' ? 'bg-white text-[#1D1D1F] shadow-xs font-semibold' : 'text-[#8E8E93] hover:text-[#1D1D1F] font-medium'"
+								class="min-h-[38px] py-1.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5"
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+								<span>A4 Grid (3 Kolom)</span>
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="bg-white rounded-2xl border border-[#E5E5EA] shadow-xs overflow-hidden">
+				<div class="px-6 py-4 border-b border-[#E5E5EA] flex items-center justify-between">
+					<div>
+						<h2 class="text-base font-bold text-[#1D1D1F]">Daftar Produk yang Akan Dicetak</h2>
+						<p class="text-xs text-[#8E8E93] mt-0.5" x-text="selectedItems.length > 0 ? (selectedItems.length + ' produk dipilih, total ' + totalCopies() + ' lembar label') : 'Pilih produk dari pencarian di atas'"></p>
+					</div>
+					<button
+						x-show="selectedItems.length > 0"
+						type="button"
+						@click="clearAll()"
+						class="text-xs font-semibold text-[#FF3B30] hover:text-[#D70015] hover:bg-red-50 px-3 min-h-[36px] inline-flex items-center rounded-xl transition"
+					>
+						Kosongkan Antrean
+					</button>
+				</div>
+				<div class="overflow-x-auto">
+					<table class="w-full text-left border-collapse">
+						<thead class="bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]">
+							<tr>
+								<th class="px-6 py-3.5 font-medium w-12 text-center">#</th>
+								<th class="px-6 py-3.5 font-medium">Produk</th>
+								<th class="px-6 py-3.5 font-medium w-64">Satuan &amp; Harga Rak</th>
+								<th class="px-6 py-3.5 font-medium w-44 text-center">Jumlah Lembar</th>
+								<th class="px-6 py-3.5 font-medium w-32 text-right">Subtotal</th>
+								<th class="px-6 py-3.5 font-medium w-16 text-right">Aksi</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+							<template x-for="(item, index) in selectedItems" :key="item.id">
+								<tr class="hover:bg-[#F5F5F7]/50 transition">
+									<td class="px-6 py-3.5 text-center text-xs font-semibold text-[#8E8E93] tabular-nums" x-text="index + 1"></td>
+									<td class="px-6 py-3.5">
+										<div class="font-semibold text-sm text-[#1D1D1F]" x-text="item.name"></div>
+										<div class="flex items-center gap-2 mt-1">
+											<span class="inline-block px-2 py-0.5 bg-[#F5F5F7] rounded text-xs font-mono text-[#8E8E93]" x-text="item.sku"></span>
+											<span x-show="item.category_name" class="text-xs text-[#8E8E93]" x-text="'• ' + item.category_name"></span>
+										</div>
+									</td>
+									<td class="px-6 py-3.5">
+										<select
+											x-model.number="item.unit_id"
+											class="w-full bg-[#F5F5F7] border border-transparent focus:border-[#007AFF] focus:bg-white rounded-xl px-3 min-h-[38px] text-xs font-medium text-[#1D1D1F] outline-none transition"
+										>
+											<template x-for="u in getProductUnits(item.id)" :key="u.id">
+												<option :value="u.id" x-text="u.unit_name + ' — Rp ' + u.price"></option>
+											</template>
+										</select>
+									</td>
+									<td class="px-6 py-3.5">
+										<div class="flex items-center justify-center gap-1.5">
+											<button
+												type="button"
+												@click="if (item.qty > 1) item.qty--"
+												class="w-8 h-8 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] font-bold text-sm flex items-center justify-center transition"
+											>
+												-
+											</button>
+											<input
+												type="number"
+												x-model.number="item.qty"
+												min="1"
+												class="w-16 min-h-[34px] text-center text-sm font-bold bg-[#F5F5F7] border border-transparent focus:border-[#007AFF] focus:bg-white rounded-lg outline-none transition tabular-nums"
+											/>
+											<button
+												type="button"
+												@click="item.qty++"
+												class="w-8 h-8 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] font-bold text-sm flex items-center justify-center transition"
+											>
+												+
+											</button>
+										</div>
+									</td>
+									<td class="px-6 py-3.5 text-right font-bold text-[#007AFF] tabular-nums text-xs">
+										<span x-text="item.qty + ' lembar'"></span>
+									</td>
+									<td class="px-6 py-3.5 text-right">
+										<button
+											type="button"
+											@click="removeProduct(index)"
+											class="inline-flex items-center justify-center min-w-[36px] min-h-[36px] bg-[#FF3B30]/10 text-[#FF3B30] hover:bg-[#FF3B30]/20 rounded-xl transition"
+											title="Hapus dari antrean"
+										>
+											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+										</button>
+									</td>
+								</tr>
+							</template>
+						</tbody>
+					</table>
+					<div x-show="selectedItems.length === 0" class="py-16 text-center px-4">
+						<div class="w-14 h-14 mx-auto rounded-2xl bg-[#007AFF]/10 text-[#007AFF] flex items-center justify-center mb-3">
+							<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h10M7 11h10M7 15h6M4 4h16v16H4z"></path></svg>
+						</div>
+						<h3 class="text-sm font-bold text-[#1D1D1F]">Antrean Cetak Masih Kosong</h3>
+						<p class="text-xs text-[#8E8E93] max-w-sm mx-auto mt-1">
+							Ketik nama barang atau gunakan barcode scanner pada kolom pencarian di atas untuk memasukkan produk ke daftar cetak.
+						</p>
+					</div>
+				</div>
+				<div class="p-4 sm:p-5 border-t border-[#E5E5EA] bg-[#F5F5F7]/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+					<div class="flex flex-wrap items-center gap-4 sm:gap-6 text-sm">
+						<div>
+							<span class="text-xs text-[#8E8E93] block">Jenis Produk</span>
+							<span class="font-bold text-[#1D1D1F]" x-text="selectedItems.length + ' produk'"></span>
+						</div>
+						<div class="h-8 w-px bg-[#E5E5EA] hidden sm:block"></div>
+						<div>
+							<span class="text-xs text-[#8E8E93] block">Total Lembar Label</span>
+							<span class="font-bold text-[#007AFF] tabular-nums" x-text="totalCopies() + ' label'"></span>
+						</div>
+						<div class="h-8 w-px bg-[#E5E5EA] hidden sm:block"></div>
+						<div>
+							<span class="text-xs text-[#8E8E93] block">Format Cetak</span>
+							<span class="font-semibold text-[#1D1D1F]" x-text="format === 'thermal' ? 'Roll Thermal 50x30mm' : 'Lembaran A4 (3 Kolom)'"></span>
+						</div>
+					</div>
+					<div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+						<a
+							href="/products"
+							class="flex-1 sm:flex-none px-5 min-h-[44px] inline-flex items-center justify-center rounded-xl border border-[#E5E5EA] bg-white text-[#1D1D1F] text-sm font-semibold hover:bg-[#F5F5F7] transition shadow-xs"
+						>
+							Batal
+						</a>
+						<button
+							type="button"
+							@click="submitForm()"
+							:disabled="selectedItems.length === 0"
+							class="flex-1 sm:flex-none bg-[#007AFF] hover:bg-[#0066D6] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 min-h-[44px] rounded-xl transition shadow-xs flex items-center justify-center gap-2"
+						>
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+							<span>Buka Halaman Cetak Label</span>
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ PrintLabelsPreviewView(labels []PrintLabelDTO, format string, storeName string) {
+	<!DOCTYPE html>
+	<html lang="id">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Cetak Label Rak - { storeName }</title>
+			<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+			<style>
+				* {
+					box-sizing: border-box;
+				}
+				body {
+					font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+					margin: 0;
+					padding: 0;
+					background: #F5F5F7;
+					color: #1D1D1F;
+				}
+				.no-print-bar {
+					position: sticky;
+					top: 0;
+					left: 0;
+					right: 0;
+					z-index: 100;
+					background: #FFFFFF;
+					border-bottom: 1px solid #E5E5EA;
+					padding: 12px 24px;
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					gap: 16px;
+					box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+				}
+				.btn-print {
+					background: #007AFF;
+					color: #FFFFFF;
+					border: none;
+					padding: 9px 20px;
+					border-radius: 10px;
+					font-size: 13px;
+					font-weight: 600;
+					cursor: pointer;
+					display: inline-flex;
+					align-items: center;
+					gap: 8px;
+					transition: background 0.15s ease;
+				}
+				.btn-print:hover {
+					background: #0066D6;
+				}
+				.btn-close {
+					background: #E5E5EA;
+					color: #1D1D1F;
+					border: none;
+					padding: 9px 16px;
+					border-radius: 10px;
+					font-size: 13px;
+					font-weight: 600;
+					cursor: pointer;
+				}
+				.btn-close:hover {
+					background: #D1D1D6;
+				}
+
+				/* Common Label Inner Typography */
+				.store-title {
+					font-size: 7.5px;
+					font-weight: 700;
+					text-transform: uppercase;
+					letter-spacing: 0.5px;
+					color: #555;
+					line-height: 1;
+					margin-bottom: 1px;
+					white-space: nowrap;
+					overflow: hidden;
+					text-overflow: ellipsis;
+					width: 100%;
+				}
+				.product-title {
+					font-size: 9.5px;
+					font-weight: 700;
+					line-height: 1.15;
+					color: #000;
+					display: -webkit-box;
+					-webkit-line-clamp: 2;
+					-webkit-box-orient: vertical;
+					overflow: hidden;
+					max-height: 22px;
+					width: 100%;
+					word-break: break-word;
+				}
+				.barcode-wrap {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					width: 100%;
+					margin: 1px 0;
+				}
+				.barcode-svg {
+					max-width: 100%;
+					height: auto;
+				}
+				.price-row {
+					display: flex;
+					align-items: baseline;
+					justify-content: space-between;
+					width: 100%;
+					border-top: 1.5px solid #000;
+					padding-top: 1.5px;
+					margin-top: 1px;
+				}
+				.price-val {
+					font-size: 13.5px;
+					font-weight: 900;
+					color: #000;
+					line-height: 1;
+					letter-spacing: -0.3px;
+				}
+				.price-meta {
+					font-size: 8px;
+					font-weight: 600;
+					color: #333;
+					line-height: 1;
+					text-align: right;
+					white-space: nowrap;
+				}
+			</style>
+			if format == "thermal" {
+				<style>
+					@page {
+						size: 50mm 30mm;
+						margin: 0;
+					}
+					.preview-container {
+						padding: 24px 0;
+						display: flex;
+						flex-direction: column;
+						align-items: center;
+						gap: 12px;
+					}
+					.label-card {
+						width: 50mm;
+						height: 30mm;
+						box-sizing: border-box;
+						background: #FFFFFF;
+						box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+						border: 1px solid #E5E5EA;
+						padding: 1.5mm 2mm;
+						display: flex;
+						flex-direction: column;
+						justify-content: space-between;
+						align-items: center;
+						text-align: center;
+						overflow: hidden;
+						page-break-after: always;
+						break-after: page;
+					}
+					@media print {
+						.no-print-bar {
+							display: none !important;
+						}
+						body {
+							background: #FFFFFF !important;
+							padding: 0 !important;
+							margin: 0 !important;
+						}
+						.preview-container {
+							padding: 0 !important;
+							gap: 0 !important;
+						}
+						.label-card {
+							box-shadow: none !important;
+							border: none !important;
+							margin: 0 !important;
+							page-break-after: always !important;
+							break-after: page !important;
+						}
+					}
+				</style>
+			} else {
+				<style>
+					@page {
+						size: A4 portrait;
+						margin: 8mm;
+					}
+					.preview-container {
+						max-width: 210mm;
+						margin: 24px auto;
+						padding: 6mm;
+						background: #FFFFFF;
+						box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+						border-radius: 8px;
+					}
+					.a4-grid {
+						display: grid;
+						grid-template-columns: repeat(3, 62mm);
+						gap: 3.5mm;
+						justify-content: center;
+					}
+					.label-card {
+						width: 62mm;
+						height: 34mm;
+						box-sizing: border-box;
+						border: 1px dashed #A1A1A6;
+						border-radius: 4px;
+						padding: 2mm 3mm;
+						display: flex;
+						flex-direction: column;
+						justify-content: space-between;
+						align-items: center;
+						text-align: center;
+						overflow: hidden;
+						page-break-inside: avoid;
+						break-inside: avoid;
+						background: #FFFFFF;
+					}
+					@media print {
+						.no-print-bar {
+							display: none !important;
+						}
+						body {
+							background: #FFFFFF !important;
+							padding: 0 !important;
+							margin: 0 !important;
+						}
+						.preview-container {
+							margin: 0 !important;
+							padding: 0 !important;
+							box-shadow: none !important;
+							border-radius: 0 !important;
+							max-width: none !important;
+							width: 100% !important;
+						}
+						.a4-grid {
+							display: grid !important;
+							grid-template-columns: repeat(3, 62mm) !important;
+							gap: 3.5mm !important;
+							justify-content: center !important;
+						}
+						.label-card {
+							border: 1px dashed #8E8E93 !important;
+							box-shadow: none !important;
+							page-break-inside: avoid !important;
+							break-inside: avoid !important;
+						}
+					}
+				</style>
+			}
+		</head>
+		<body>
+			<div class="no-print-bar">
+				<div>
+					<strong style="font-size: 15px;">Preview Label Rak Toko</strong>
+					<span style="font-size: 12px; color: #8E8E93; margin-left: 8px;">
+						{ fmt.Sprintf("%d Label • Format: %s", len(labels), strings.ToUpper(format)) }
+					</span>
+				</div>
+				<div style="display: flex; gap: 8px;">
+					<button class="btn-close" onclick="window.close()">Tutup Tab</button>
+					<button class="btn-print" onclick="window.print()">
+						<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+						<span>Cetak Sekarang (Ctrl+P)</span>
+					</button>
+				</div>
+			</div>
+			<div class="preview-container">
+				if format == "a4" {
+					<div class="a4-grid">
+						for _, label := range labels {
+							@renderLabelCard(label)
+						}
+					</div>
+				} else {
+					for _, label := range labels {
+						@renderLabelCard(label)
+					}
+				}
+			</div>
+			<script>
+				window.addEventListener('load', function() {
+					try {
+						JsBarcode(".barcode-svg").init();
+					} catch(e) {
+						console.error("JsBarcode error:", e);
+					}
+				});
+			</script>
+		</body>
+	</html>
+}
+
+templ renderLabelCard(label PrintLabelDTO) {
+	<div class="label-card">
+		<div class="store-title">{ label.StoreName }</div>
+		<div class="product-title">{ label.ProductName }</div>
+		<div class="barcode-wrap">
+			<svg
+				class="barcode-svg"
+				jsbarcode-format="CODE128"
+				jsbarcode-value={ label.SKU }
+				jsbarcode-width="1.2"
+				jsbarcode-height="22"
+				jsbarcode-textmargin="0"
+				jsbarcode-fontsize="8"
+				jsbarcode-margin="0"
+			></svg>
+		</div>
+		<div class="price-row">
+			<div class="price-val">Rp { label.FormattedPrice }</div>
+			<div class="price-meta">/{ label.UnitName } <span style="font-size: 7px; color: #777;">• { label.PrintDate }</span></div>
+		</div>
+	</div>
+}

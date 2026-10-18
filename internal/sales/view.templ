@@ -1,0 +1,2671 @@
+package sales
+
+import (
+	"encoding/json"
+	"fmt"
+	repo "github.com/ELghazX/pos-toko-ubaidillah/internal/adapters/postgresql/sqlc"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/utils"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/views"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/views/components"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+func calcGrossSubtotal(details []repo.GetSaleDetailsRow) float64 {
+	var total float64
+	for _, d := range details {
+		total += utils.NumericToFloat(d.Subtotal) + utils.NumericToFloat(d.Discount)
+	}
+	return total
+}
+
+func calcTotalItemDiscounts(details []repo.GetSaleDetailsRow) float64 {
+	var total float64
+	for _, d := range details {
+		total += utils.NumericToFloat(d.Discount)
+	}
+	return total
+}
+
+func calcTotalDiscounts(details []repo.GetSaleDetailsRow, notaDisc pgtype.Numeric) float64 {
+	return calcTotalItemDiscounts(details) + utils.NumericToFloat(notaDisc)
+}
+
+func toJSON(v interface{}) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
+}
+
+type customerContactDTO struct {
+	ID    int32  `json:"id"`
+	Name  string `json:"name"`
+	Phone string `json:"phone"`
+}
+
+func serializeCustomerContacts(customers []repo.Customer) string {
+	var list []customerContactDTO
+	for _, c := range customers {
+		p := ""
+		if c.Phone.Valid {
+			p = c.Phone.String
+		}
+		if p != "" {
+			list = append(list, customerContactDTO{ID: c.ID, Name: c.Name, Phone: p})
+		}
+	}
+	b, err := json.Marshal(list)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
+}
+
+templ POSPage(data POSMasterData) {
+	@views.POSLayout("Layar Kasir (POS)") {
+		<div
+			x-data={ fmt.Sprintf(`posApp({
+				rawProducts: %s,
+				rawUnits: %s,
+				rawCategories: %s,
+				rawCustomers: %s,
+				rawRecentSales: %s,
+				initialInvoiceNo: %q
+			})`, toJSON(data.Products), toJSON(data.Units), toJSON(data.Categories), toJSON(data.Customers), toJSON(data.RecentSales), data.InvoiceNo) }
+			class="w-full flex-1 h-[100dvh] min-h-[100dvh] flex flex-col overflow-hidden bg-[#F5F5F7]"
+			@keydown.f1.window.prevent="showShortcutModal = true"
+			@keydown.f2.window.prevent="$refs.searchInput.focus(); $refs.searchInput.select()"
+			@keydown.f3.window.prevent="openCustomerDropdown()"
+			@keydown.f4.window.prevent="openRecentSalesModal()"
+			@keydown.f7.window.prevent="$refs.discountInput.focus(); $refs.discountInput.select()"
+			@keydown.f8.window.prevent="clearCart()"
+			@keydown.f9.window.prevent="openPaymentModal()"
+			@keydown.escape.window="closeModals()"
+		>
+			@components.DrawerSidebar("pos")
+			<header class="h-14 bg-white border-b border-[#E5E5EA] px-3 sm:px-4 flex items-center justify-between z-20 flex-shrink-0">
+				<div class="flex items-center gap-2 sm:gap-3">
+					<button
+						type="button"
+						@click="sidebarOpen = !sidebarOpen"
+						class="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 min-h-[38px] bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] text-xs font-semibold rounded-xl border border-[#E5E5EA] shadow-2xs transition"
+						title="Buka Menu Sidebar (Backoffice)"
+					>
+						<svg class="w-4 h-4 text-[#8E8E93]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path></svg>
+						<span class="hidden sm:inline">Menu</span>
+					</button>
+					<div class="h-5 w-[1px] bg-[#E5E5EA] hidden sm:block"></div>
+					<!-- Mobile Segmented View: Katalog vs Keranjang -->
+					<div class="flex lg:hidden items-center bg-[#F5F5F7] p-1 rounded-xl border border-[#E5E5EA]">
+						<button
+							type="button"
+							@click="posView = 'catalog'"
+							class="px-2.5 py-1 text-xs font-semibold rounded-lg transition"
+							:class="posView === 'catalog' ? 'bg-white text-[#1D1D1F] shadow-xs' : 'text-[#8E8E93]'"
+						>
+							Katalog
+						</button>
+						<button
+							type="button"
+							@click="posView = 'cart'"
+							class="px-2.5 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5"
+							:class="posView === 'cart' ? 'bg-white text-[#1D1D1F] shadow-xs' : 'text-[#8E8E93]'"
+						>
+							<span>Keranjang</span>
+							<span
+								x-show="cart.length > 0"
+								class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-[#007AFF] text-white tabular-nums"
+								x-text="cart.reduce((sum, item) => sum + item.qty, 0)"
+							></span>
+						</button>
+					</div>
+				</div>
+				<div class="hidden md:flex items-center gap-2 text-xs font-medium text-[#8E8E93]">
+					<span class="w-2 h-2 rounded-full bg-[#34C759] animate-pulse"></span>
+					<span x-text="currentTime"></span>
+				</div>
+				<div class="flex items-center gap-1.5 sm:gap-2">
+					<button
+						type="button"
+						@click="showShortcutModal = true"
+						class="inline-flex items-center gap-1.5 px-2.5 sm:px-3 min-h-[36px] bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] rounded-xl text-xs font-medium transition"
+						title="Bantuan Shortcut Keyboard (F1)"
+					>
+						<svg class="w-4 h-4 text-[#8E8E93]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z"></path></svg>
+						<span class="hidden md:inline">Shortcut</span>
+						<span class="hidden sm:inline bg-[#E5E5EA] text-[10px] font-mono px-1.5 py-0.5 rounded font-semibold text-[#8E8E93]">F1</span>
+					</button>
+					<button
+						type="button"
+						@click="openRecentSalesModal()"
+						class="inline-flex items-center gap-1.5 px-2.5 sm:px-3 min-h-[36px] bg-[#007AFF]/10 hover:bg-[#007AFF]/20 text-[#007AFF] rounded-xl text-xs font-semibold transition"
+						title="Lihat Riwayat & Batal Transaksi Hari Ini (F4)"
+					>
+						<svg class="w-4 h-4 text-[#007AFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path></svg>
+						<span class="hidden sm:inline">Riwayat & Void</span>
+						<span class="hidden sm:inline bg-[#007AFF]/20 text-[10px] font-mono px-1.5 py-0.5 rounded font-semibold text-[#007AFF]">F4</span>
+					</button>
+				</div>
+			</header>
+			<div class="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden relative">
+				<div
+					:class="posView === 'cart' ? 'hidden lg:flex' : 'flex'"
+					class="flex-1 h-full min-w-0 min-h-0 flex-col border-r border-[#E5E5EA] overflow-hidden bg-white/50 relative"
+				>
+					<div class="p-4 border-b border-[#E5E5EA] bg-white space-y-3">
+						<div class="flex items-center gap-3">
+							<div class="relative flex-1">
+								<input
+									x-ref="searchInput"
+									x-model="searchQuery"
+									@keydown.enter.prevent="handleBarcodeScan()"
+									type="text"
+									placeholder="Scan barcode SKU atau ketik nama barang... (Tekan F2)"
+									class="w-full pl-10 pr-24 min-h-[44px] bg-[#F5F5F7] border border-transparent rounded-xl text-sm focus:bg-white focus:border-[#007AFF] outline-none transition"
+									autofocus
+								/>
+								<svg class="w-5 h-5 text-[#8E8E93] absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75ZM6.75 16.5h.75v.75h-.75v-.75ZM16.5 6.75h.75v.75h-.75v-.75ZM13.5 13.5h.75v.75h-.75v-.75ZM13.5 19.5h.75v.75h-.75v-.75ZM19.5 13.5h.75v.75h-.75v-.75ZM19.5 19.5h.75v.75h-.75v-.75ZM16.5 16.5h.75v.75h-.75v-.75Z"></path></svg>
+								<span class="absolute right-3 top-3 text-xs text-[#8E8E93] bg-[#E5E5EA] px-2 py-0.5 rounded-md font-mono">F2</span>
+							</div>
+							<button
+								@click="searchQuery = ''; selectedCategory = 0; $refs.searchInput.focus()"
+								class="min-h-[44px] px-3.5 rounded-xl border border-[#E5E5EA] text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-[#F5F5F7] text-sm font-medium transition"
+							>
+								Reset
+							</button>
+						</div>
+						<div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+							<button
+								@click="selectedCategory = 0"
+								class="px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition min-h-[36px]"
+								:class="selectedCategory === 0 ? 'bg-[#007AFF] text-white shadow-xs' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'"
+							>
+								Semua Kategori
+							</button>
+							<template x-for="cat in categories" :key="cat.id">
+								<button
+									@click="selectedCategory = cat.id"
+									class="px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition min-h-[36px]"
+									:class="selectedCategory === cat.id ? 'bg-[#007AFF] text-white shadow-xs' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'"
+									x-text="cat.name"
+								></button>
+							</template>
+						</div>
+					</div>
+					<div class="flex-1 min-h-0 overflow-y-auto p-4 pb-24 sm:pb-12" style="scrollbar-gutter: stable;">
+						<div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-3">
+							<template x-for="p in filteredProducts" :key="p.id">
+								<div class="bg-white rounded-2xl border border-[#E5E5EA] hover:border-[#007AFF]/40 hover:shadow-md transition flex flex-col justify-between p-3.5 min-w-0">
+									<div>
+										<div class="flex items-center justify-between mb-1 text-[11px] text-[#8E8E93]">
+											<span class="font-mono truncate" x-text="p.sku"></span>
+											<template x-if="p.type === 'jasa'">
+												<span class="px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-600 font-medium">Jasa</span>
+											</template>
+											<template x-if="p.type !== 'jasa'">
+												<span
+													:class="p.current_stock > (p.min_stock || 5) ? 'text-[#8E8E93] font-normal' : (p.current_stock > 0 ? 'px-1.5 py-0.5 rounded-md font-medium bg-amber-50 text-[#FF9500]' : 'px-1.5 py-0.5 rounded-md font-medium bg-red-50 text-[#FF3B30]')"
+													x-text="p.current_stock <= 0 ? 'Habis (0)' : (p.current_stock <= (p.min_stock || 5) ? 'Sisa ' + p.current_stock + ' (Menipis)' : 'Stok: ' + p.current_stock)"
+												></span>
+											</template>
+										</div>
+										<h4 class="font-semibold text-sm text-[#1D1D1F] line-clamp-2 leading-snug" x-text="p.name"></h4>
+										<template x-if="p.is_open_price">
+											<span class="inline-block mt-1 text-[11px] font-semibold text-[#FF9500] bg-amber-50 px-2 py-0.5 rounded-md">
+												Harga Fleksibel
+											</span>
+										</template>
+									</div>
+									<div class="mt-3 pt-2 border-t border-[#E5E5EA]/60 space-y-1.5">
+										<template x-for="u in getProductUnits(p.id)" :key="u.id">
+											<button
+												@click="addToCart(p, u)"
+												type="button"
+												class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-[#F5F5F7] hover:bg-[#007AFF] hover:text-white group transition text-left min-w-0 gap-1.5"
+											>
+												<span class="text-xs font-medium text-[#1D1D1F] group-hover:text-white truncate" x-text="u.unit_name"></span>
+												<span class="text-xs font-semibold text-[#007AFF] group-hover:text-white tabular-nums flex-shrink-0" x-text="p.is_open_price ? 'Fleksibel' : formatRupiah(u.price)"></span>
+											</button>
+										</template>
+									</div>
+								</div>
+							</template>
+						</div>
+						<template x-if="filteredProducts.length === 0">
+							<div class="flex flex-col items-center justify-center h-64 text-[#8E8E93]">
+								<svg class="w-12 h-12 mb-2 text-[#8E8E93]/60" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path></svg>
+								<p class="text-sm font-medium">Tidak ada produk ditemukan</p>
+								<p class="text-xs text-[#8E8E93]/80 mt-1">Coba cari dengan kata kunci lain atau periksa filter kategori</p>
+							</div>
+						</template>
+					</div>
+					<!-- Mobile Floating Mini-Cart Bar -->
+					<div
+						x-show="cart.length > 0"
+						x-transition
+						class="lg:hidden absolute bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] left-3 right-3 z-20 bg-[#1D1D1F]/95 backdrop-blur-md text-white p-3 rounded-2xl shadow-xl flex items-center justify-between border border-white/10"
+					>
+						<div class="min-w-0 pr-2">
+							<div class="text-xs text-gray-300">
+								<span class="font-bold text-white tabular-nums" x-text="cart.reduce((sum, item) => sum + item.qty, 0)"></span> Barang di keranjang
+							</div>
+							<div class="text-base font-bold text-white tabular-nums truncate" x-text="'Rp ' + formatRupiah(calculateGrandTotal())"></div>
+						</div>
+						<button
+							type="button"
+							@click="posView = 'cart'"
+							class="bg-[#007AFF] hover:bg-[#0066D6] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs transition flex items-center gap-1.5 shrink-0 active:scale-95"
+						>
+							<span>Buka Keranjang</span>
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"></path></svg>
+						</button>
+					</div>
+				</div>
+				<div
+					:class="posView === 'catalog' ? 'hidden lg:flex' : 'flex'"
+					class="w-full lg:w-[450px] lg:min-w-[450px] lg:max-w-[450px] flex-shrink-0 min-h-0 flex-col h-full bg-white shadow-lg z-10 overflow-hidden"
+				>
+					<div class="p-3 sm:p-4 border-b border-[#E5E5EA] space-y-3 bg-white flex-shrink-0">
+						<div class="flex items-center justify-between">
+							<div class="flex items-center gap-2">
+								<button
+									type="button"
+									@click="posView = 'catalog'"
+									class="lg:hidden min-w-[36px] min-h-[36px] inline-flex items-center justify-center rounded-xl bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA] transition"
+									title="Kembali ke Katalog"
+								>
+									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"></path></svg>
+								</button>
+								<div>
+									<div class="flex items-center gap-2">
+										<span class="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider">No. Nota</span>
+										<span class="text-xs font-mono font-bold text-[#007AFF] bg-[#007AFF]/10 px-2 py-0.5 rounded-md" x-text="invoiceNo"></span>
+									</div>
+									<h3 class="text-base sm:text-lg font-bold text-[#1D1D1F]">Keranjang Kasir</h3>
+								</div>
+							</div>
+							<button
+								@click="clearCart()"
+								class="text-xs font-semibold text-[#FF3B30] hover:bg-red-50 px-2.5 py-1.5 rounded-xl transition inline-flex items-center gap-1"
+								x-show="cart.length > 0"
+							>
+								<span>Kosongkan</span>
+								<span class="hidden sm:inline bg-red-100 text-[10px] px-1 rounded font-mono">F8</span>
+							</button>
+						</div>
+						<div class="relative" @click.outside="customerDropdownOpen = false">
+							<div class="flex items-center gap-2">
+								<button
+									type="button"
+									@click="customerDropdownOpen = !customerDropdownOpen"
+									class="flex-1 bg-[#F5F5F7] hover:bg-[#E5E5EA]/80 border border-transparent hover:border-[#E5E5EA] rounded-xl px-3 min-h-[42px] text-sm text-left flex items-center justify-between focus:bg-white focus:border-[#007AFF] outline-none transition"
+								>
+									<div class="flex items-center gap-2 truncate">
+										<svg class="w-4 h-4 text-[#8E8E93] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"></path></svg>
+										<span class="truncate font-semibold text-[#1D1D1F]" x-text="selectedCustomerName"></span>
+									</div>
+									<div class="flex items-center gap-1.5 flex-shrink-0 ml-2">
+										<span class="bg-[#E5E5EA] text-[10px] font-mono px-1.5 py-0.5 rounded font-semibold text-[#8E8E93]">F3</span>
+										<svg class="w-4 h-4 text-[#8E8E93]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"></path></svg>
+									</div>
+								</button>
+								<template x-if="selectedCustomerId">
+									<button
+										type="button"
+										@click="selectCustomer(null)"
+										class="min-w-[36px] min-h-[42px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#FF3B30] hover:bg-red-50 rounded-xl transition"
+										title="Reset ke Pelanggan Umum"
+									>
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path></svg>
+									</button>
+								</template>
+								<a
+									href="/customers/new"
+									target="_blank"
+									title="Tambah Pelanggan Baru (Tab Baru)"
+									class="min-w-[42px] min-h-[42px] inline-flex items-center justify-center bg-[#F5F5F7] text-[#007AFF] hover:bg-[#007AFF]/10 rounded-xl transition"
+								>
+									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z"></path></svg>
+								</a>
+							</div>
+							<div
+								x-show="customerDropdownOpen"
+								x-cloak
+								class="absolute left-0 right-0 z-30 mt-1.5 bg-white border border-[#E5E5EA] rounded-2xl shadow-xl p-2 space-y-1.5"
+							>
+								<div class="relative">
+									<input
+										type="text"
+										x-ref="customerSearchInput"
+										x-model="customerSearch"
+										@keydown.enter.prevent="if (filteredCustomers.length > 0) selectCustomer(filteredCustomers[0])"
+										@keydown.escape.stop="customerDropdownOpen = false"
+										placeholder="Cari nama, telepon, atau alamat..."
+										class="w-full pl-9 pr-3 py-2 bg-[#F5F5F7] rounded-xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-[#007AFF] transition"
+									/>
+									<svg class="w-4 h-4 text-[#8E8E93] absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path></svg>
+								</div>
+								<div class="max-h-60 overflow-y-auto divide-y divide-[#E5E5EA]/60">
+									<button
+										type="button"
+										@click="selectCustomer(null)"
+										class="w-full text-left px-3 py-2.5 rounded-xl text-sm hover:bg-[#007AFF]/10 flex items-center justify-between transition"
+									>
+										<div>
+											<span :class="!selectedCustomerId ? 'font-bold text-[#007AFF]' : 'font-medium text-[#1D1D1F]'">Pelanggan Umum (Walk-in)</span>
+											<p class="text-[11px] text-[#8E8E93]">Tanpa pencatatan data identitas</p>
+										</div>
+										<svg x-show="!selectedCustomerId" class="w-4 h-4 text-[#007AFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path></svg>
+									</button>
+									<template x-for="c in filteredCustomers" :key="c.id">
+										<button
+											type="button"
+											@click="selectCustomer(c)"
+											class="w-full text-left px-3 py-2.5 rounded-xl text-sm hover:bg-[#007AFF]/10 flex items-center justify-between transition"
+										>
+											<div class="min-w-0 pr-2">
+												<span :class="selectedCustomerId === c.id ? 'font-bold text-[#007AFF]' : 'font-medium text-[#1D1D1F]'" x-text="c.name"></span>
+												<div class="flex items-center gap-2 text-[11px] text-[#8E8E93] mt-0.5 truncate">
+													<span x-show="getCustomerPhone(c)" x-text="getCustomerPhone(c)"></span>
+													<span x-show="getCustomerAddress(c)" x-text="getCustomerAddress(c)" class="truncate"></span>
+												</div>
+											</div>
+											<svg x-show="selectedCustomerId === c.id" class="w-4 h-4 text-[#007AFF] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path></svg>
+										</button>
+									</template>
+									<div x-show="filteredCustomers.length === 0" class="px-3 py-4 text-xs text-[#8E8E93] text-center">
+										<p>Pelanggan tidak ditemukan.</p>
+										<a href="/customers/new" target="_blank" class="text-[#007AFF] font-semibold hover:underline mt-1 inline-block">+ Tambah Pelanggan Baru</a>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="flex-1 min-h-0 overflow-y-auto divide-y divide-[#E5E5EA]/60 p-2">
+						<template x-for="(item, idx) in cart" :key="item.product_id + '_' + item.unit_id + '_' + idx">
+							<div class="p-2.5 hover:bg-[#F5F5F7]/50 rounded-xl transition">
+								<div class="flex items-start justify-between gap-2">
+									<div class="flex-1 min-w-0">
+										<div class="flex items-center gap-1.5">
+											<h5 class="text-sm font-semibold text-[#1D1D1F] truncate" x-text="item.name"></h5>
+											<template x-if="item.is_open_price">
+												<span class="text-[10px] text-[#FF9500] font-semibold bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-md">Fleksibel</span>
+											</template>
+										</div>
+										<div class="flex items-center gap-2 mt-1">
+											<select
+												@change="changeUnit(idx, $event.target.value)"
+												class="text-xs bg-[#F5F5F7] border border-[#E5E5EA] rounded-lg px-2 py-0.5 text-[#1D1D1F] focus:outline-none"
+											>
+												<template x-for="u in getProductUnits(item.product_id)" :key="u.id">
+													<option :value="u.id" :selected="u.id === item.unit_id" x-text="u.unit_name + ' @ ' + formatRupiah(u.price)"></option>
+												</template>
+											</select>
+											<template x-if="item.is_open_price">
+												<button
+													type="button"
+													@click="editItemPrice(idx)"
+													class="text-xs text-[#FF9500] hover:text-amber-600 hover:underline font-semibold inline-flex items-center gap-0.5"
+													title="Klik untuk mengubah harga jasa/barang fleksibel ini"
+												>
+													<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"></path></svg>
+													<span>Ubah Harga</span>
+												</button>
+											</template>
+											<template x-if="!item.discount">
+												<button
+													type="button"
+													@click="openItemDiscountModal(idx)"
+													class="text-xs text-[#8E8E93] hover:text-[#FF3B30] hover:bg-black/5 px-2 py-0.5 rounded-md transition font-medium inline-flex items-center gap-1"
+													title="Beri potongan harga khusus untuk item ini"
+												>
+													<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z"></path></svg>
+													<span>+ Diskon</span>
+												</button>
+											</template>
+											<template x-if="item.discount > 0">
+												<button
+													type="button"
+													@click="openItemDiscountModal(idx)"
+													class="text-xs text-[#FF3B30] bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-0.5 rounded-md font-semibold inline-flex items-center gap-1 transition"
+													title="Klik untuk mengubah diskon item"
+												>
+													<svg class="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z"></path></svg>
+													<span x-text="'- Rp ' + formatRupiah(item.discount)"></span>
+												</button>
+											</template>
+										</div>
+									</div>
+									<div class="text-right">
+										<div class="text-sm font-bold text-[#1D1D1F] tabular-nums" x-text="formatRupiah(item.subtotal)"></div>
+										<template x-if="item.discount > 0">
+											<div class="text-[11px] text-[#8E8E93] line-through tabular-nums" x-text="formatRupiah(item.qty * item.price)"></div>
+										</template>
+										<button
+											@click="removeFromCart(idx)"
+											class="block ml-auto mt-1 text-[#8E8E93] hover:text-[#FF3B30] transition p-1"
+											title="Hapus Barang"
+										>
+											<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"></path></svg>
+										</button>
+									</div>
+								</div>
+								<div class="flex items-center justify-between mt-2 pt-1">
+									<div class="flex items-center gap-1.5">
+										<button
+											@click="updateQty(idx, -1)"
+											class="w-9 h-9 rounded-xl bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] text-base font-bold flex items-center justify-center transition active:scale-95"
+										>-</button>
+										<input
+											type="number"
+											min="1"
+											:value="item.qty"
+											@change="setQty(idx, $event.target.value)"
+											class="w-12 h-9 text-center text-sm font-semibold border border-[#E5E5EA] rounded-xl py-0.5 tabular-nums focus:outline-none focus:border-[#007AFF]"
+										/>
+										<button
+											@click="updateQty(idx, 1)"
+											class="w-9 h-9 rounded-xl bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] text-base font-bold flex items-center justify-center transition active:scale-95"
+										>+</button>
+									</div>
+									<template x-if="item.is_open_price">
+										<span class="text-xs font-semibold text-[#FF9500] cursor-pointer hover:underline" @click="editItemPrice(idx)" title="Klik untuk sesuaikan harga">Fleksibel</span>
+									</template>
+									<template x-if="!item.is_open_price">
+										<span class="text-xs text-[#8E8E93] tabular-nums" x-text="'@ ' + formatRupiah(item.price)"></span>
+									</template>
+								</div>
+							</div>
+						</template>
+						<template x-if="cart.length === 0">
+							<div class="flex flex-col items-center justify-center h-full text-[#8E8E93] p-6 text-center">
+								<svg class="w-16 h-16 text-[#8E8E93]/40 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"></path></svg>
+								<p class="font-medium text-[#1D1D1F]">Keranjang Kasir Kosong</p>
+								<p class="text-xs mt-1">Scan barcode SKU atau pilih produk dari katalog (Tekan F2)</p>
+							</div>
+						</template>
+					</div>
+					<div class="p-4 border-t border-[#E5E5EA] bg-[#F5F5F7] space-y-3 flex-shrink-0 pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))] sm:pb-5">
+						<div class="space-y-1.5 text-sm">
+							<div class="flex justify-between text-[#8E8E93]">
+								<span>Subtotal</span>
+								<span class="font-medium text-[#1D1D1F] tabular-nums" x-text="formatRupiah(calculateGrossTotal())"></span>
+							</div>
+							<template x-if="calculateTotalItemDiscount() > 0">
+								<div class="flex justify-between text-[#FF3B30] text-xs font-semibold">
+									<span>Diskon Item</span>
+									<span class="tabular-nums" x-text="'- Rp ' + formatRupiah(calculateTotalItemDiscount())"></span>
+								</div>
+							</template>
+							<div class="flex items-center justify-between text-[#8E8E93]">
+								<span class="flex items-center gap-1">
+									<span>Diskon Nota (Rp)</span>
+									<span class="bg-[#E5E5EA] text-[10px] font-mono px-1 rounded font-semibold text-[#8E8E93]">F7</span>
+								</span>
+								<input
+									x-ref="discountInput"
+									type="number"
+									min="0"
+									x-model.number="discountAmount"
+									@focus="$event.target.select()"
+									@click="$event.target.select()"
+									placeholder="0"
+									class="w-28 text-right bg-white border border-[#E5E5EA] rounded-lg px-2 py-0.5 text-sm font-semibold text-[#1D1D1F] focus:outline-none focus:border-[#007AFF] tabular-nums"
+								/>
+							</div>
+							<div class="flex justify-between items-baseline pt-2 border-t border-[#E5E5EA]">
+								<span class="text-base font-bold text-[#1D1D1F]">Total Tagihan</span>
+								<span class="text-2xl font-extrabold text-[#007AFF] tabular-nums" x-text="formatRupiah(calculateGrandTotal())"></span>
+							</div>
+						</div>
+						<button
+							@click="openPaymentModal()"
+							:disabled="cart.length === 0"
+							type="button"
+							class="w-full bg-[#007AFF] text-white py-3.5 px-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 hover:bg-[#0066D6] disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md active:scale-[0.99]"
+						>
+							<span>Bayar Transaksi</span>
+							<span class="text-xs bg-white/20 px-2 py-0.5 rounded font-mono font-normal">F9</span>
+						</button>
+					</div>
+				</div>
+			</div>
+			<div
+				x-show="showOpenPriceModal"
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/40 backdrop-blur-xs"
+			>
+				<div
+					@click.away="showOpenPriceModal = false"
+					class="bg-white rounded-2xl shadow-xl border border-[#E5E5EA] w-full max-w-sm p-6 space-y-4 my-auto sm:my-8"
+				>
+					<div class="flex justify-between items-start">
+						<div>
+							<span class="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider">Sesuaikan Harga</span>
+							<h3 class="text-lg font-bold text-[#1D1D1F]" x-text="openPriceItem.name"></h3>
+							<span class="text-xs text-[#8E8E93]" x-text="'Satuan: ' + openPriceItem.unit_name"></span>
+						</div>
+						<button @click="showOpenPriceModal = false" class="text-[#8E8E93] hover:text-[#1D1D1F]">
+							<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<div class="space-y-3.5">
+						<div>
+							<label class="block text-xs font-semibold text-[#1D1D1F] mb-1">Jumlah (Qty)</label>
+							<input
+								type="number"
+								min="1"
+								x-model.number="openPriceItem.qty"
+								@input="onOpenPriceQtyChange()"
+								@click="$event.target.select()"
+								@focus="$event.target.select()"
+								class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-3 min-h-[42px] text-sm font-semibold focus:bg-white focus:border-[#007AFF] outline-none"
+							/>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-[#1D1D1F] mb-1">Harga Satuan (Rp)</label>
+							<input
+								type="number"
+								min="0"
+								x-ref="openPriceInput"
+								x-model.number="openPriceItem.price"
+								@input="onOpenPricePriceChange()"
+								@click="$event.target.select()"
+								@focus="$event.target.select()"
+								class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-3 min-h-[42px] text-base font-bold text-[#1D1D1F] focus:bg-white focus:border-[#007AFF] outline-none tabular-nums"
+							/>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-[#1D1D1F] mb-1">Total Subtotal (Rp)</label>
+							<input
+								type="number"
+								min="0"
+								x-model.number="openPriceItem.subtotal"
+								@input="onOpenPriceSubtotalChange()"
+								@click="$event.target.select()"
+								@focus="$event.target.select()"
+								class="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-3 min-h-[44px] text-lg font-black text-[#007AFF] focus:bg-white focus:border-[#007AFF] outline-none tabular-nums"
+							/>
+							<span class="text-[11px] text-[#8E8E93] mt-1 block">Ketik harga satuan atau total subtotal, sistem akan menghitung otomatis.</span>
+						</div>
+					</div>
+					<div class="pt-2 flex gap-2">
+						<button
+							@click="showOpenPriceModal = false"
+							type="button"
+							class="flex-1 min-h-[44px] rounded-xl border border-[#E5E5EA] font-semibold text-xs text-[#1D1D1F] hover:bg-[#F5F5F7] transition"
+						>
+							Batal
+						</button>
+						<button
+							@click="saveOpenPriceItem()"
+							type="button"
+							class="flex-2 bg-[#007AFF] text-white min-h-[44px] rounded-xl font-bold text-sm hover:bg-[#0066D6] transition shadow-xs"
+						>
+							Simpan ke Keranjang
+						</button>
+					</div>
+				</div>
+			</div>
+			<div
+				x-show="showItemDiscountModal"
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/40 backdrop-blur-xs"
+			>
+				<div
+					@click.away="showItemDiscountModal = false"
+					class="bg-white rounded-2xl border border-[#E5E5EA] shadow-xl w-full max-w-sm p-6 space-y-4 my-auto sm:my-8"
+				>
+					<div class="flex justify-between items-start">
+						<div>
+							<span class="text-xs font-semibold text-[#FF3B30] uppercase tracking-wider">Diskon Item</span>
+							<h3 class="text-lg font-bold text-[#1D1D1F]" x-text="discountItem.name"></h3>
+							<span class="text-xs text-[#8E8E93]" x-text="discountItem.qty + ' ' + discountItem.unit_name + ' @ Rp ' + formatRupiah(discountItem.price)"></span>
+						</div>
+						<button @click="showItemDiscountModal = false" class="text-[#8E8E93] hover:text-[#1D1D1F]">
+							<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<div class="space-y-3.5">
+						<div class="flex items-center justify-between text-xs text-[#8E8E93] bg-[#F5F5F7] px-3 py-2 rounded-xl">
+							<span>Total Sebelum Diskon:</span>
+							<span class="font-bold text-[#1D1D1F] tabular-nums" x-text="'Rp ' + formatRupiah(discountItem.grossTotal)"></span>
+						</div>
+						<div>
+							<label class="block text-xs font-semibold text-[#1D1D1F] mb-1">Potongan Diskon (Rp)</label>
+							<div class="relative">
+								<span class="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-sm text-[#8E8E93]">Rp</span>
+								<input
+									type="number"
+									min="0"
+									:max="discountItem.grossTotal"
+									x-ref="itemDiscountInput"
+									x-model.number="discountItem.discount"
+									@input="onItemDiscountChange()"
+									@click="$event.target.select()"
+									@focus="$event.target.select()"
+									placeholder="0"
+									class="w-full bg-[#F5F5F7] border border-transparent rounded-xl pl-10 pr-3 min-h-[44px] text-base font-bold text-[#FF3B30] focus:bg-white focus:border-[#FF3B30] outline-none tabular-nums"
+								/>
+							</div>
+						</div>
+						<div>
+							<span class="block text-[11px] font-medium text-[#8E8E93] mb-1.5">Preset Cepat:</span>
+							<div class="grid grid-cols-4 gap-1.5">
+								<button
+									type="button"
+									@click="applyItemDiscountPreset(500)"
+									class="px-2 py-1.5 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-xs font-semibold text-[#1D1D1F] transition text-center"
+								>500</button>
+								<button
+									type="button"
+									@click="applyItemDiscountPreset(1000)"
+									class="px-2 py-1.5 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-xs font-semibold text-[#1D1D1F] transition text-center"
+								>1.000</button>
+								<button
+									type="button"
+									@click="applyItemDiscountPreset(2000)"
+									class="px-2 py-1.5 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-xs font-semibold text-[#1D1D1F] transition text-center"
+								>2.000</button>
+								<button
+									type="button"
+									@click="applyItemDiscountPreset(5000)"
+									class="px-2 py-1.5 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-xs font-semibold text-[#1D1D1F] transition text-center"
+								>5.000</button>
+							</div>
+						</div>
+						<div class="p-3 bg-red-50/60 border border-red-200 rounded-xl flex items-center justify-between">
+							<span class="text-xs font-medium text-red-900">Subtotal Bersih Item:</span>
+							<span class="text-base font-black text-[#FF3B30] tabular-nums" x-text="'Rp ' + formatRupiah(discountItem.netSubtotal)"></span>
+						</div>
+					</div>
+					<div class="pt-2 flex items-center gap-2">
+						<template x-if="discountItem.discount > 0">
+							<button
+								@click="removeItemDiscount()"
+								type="button"
+								class="px-3 min-h-[44px] rounded-xl border border-red-200 text-xs font-semibold text-[#FF3B30] hover:bg-red-50 transition"
+								title="Hapus diskon pada item ini"
+							>
+								Hapus
+							</button>
+						</template>
+						<button
+							@click="showItemDiscountModal = false"
+							type="button"
+							class="flex-1 min-h-[44px] rounded-xl border border-[#E5E5EA] font-semibold text-xs text-[#1D1D1F] hover:bg-[#F5F5F7] transition"
+						>
+							Batal
+						</button>
+						<button
+							@click="saveItemDiscount()"
+							type="button"
+							class="flex-1 bg-[#007AFF] text-white min-h-[44px] rounded-xl font-bold text-sm hover:bg-[#0066D6] transition shadow-xs"
+						>
+							Terapkan
+						</button>
+					</div>
+				</div>
+			</div>
+			<div
+				x-show="showRecentSalesModal"
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/50 backdrop-blur-xs"
+			>
+				<div
+					@click.away="showRecentSalesModal = false"
+					class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-4xl overflow-hidden flex flex-col max-h-[85vh]"
+				>
+					<div class="p-5 border-b border-[#E5E5EA] flex justify-between items-center bg-[#F5F5F7]/80">
+						<div>
+							<span class="text-xs font-semibold text-[#007AFF] uppercase tracking-wider">Histori Kasir</span>
+							<h3 class="text-xl font-bold text-[#1D1D1F]">Riwayat Transaksi Hari Ini</h3>
+						</div>
+						<button @click="showRecentSalesModal = false" class="min-w-[36px] min-h-[36px] inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5">
+							<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<div class="p-4 border-b border-[#E5E5EA] bg-white">
+						<input
+							type="text"
+							x-model="recentSalesQuery"
+							placeholder="Cari nomor nota atau nama pelanggan..."
+							class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[40px] text-sm focus:bg-white focus:border-[#007AFF] outline-none"
+						/>
+					</div>
+					<div class="flex-1 overflow-y-auto">
+						<table class="w-full text-left border-collapse">
+							<thead class="bg-[#F5F5F7]/70 text-[#8E8E93] text-xs uppercase tracking-wider border-b border-[#E5E5EA]">
+								<tr>
+									<th class="px-5 py-3 font-semibold">No. Nota</th>
+									<th class="px-5 py-3 font-semibold">Pelanggan</th>
+									<th class="px-5 py-3 font-semibold">Metode</th>
+									<th class="px-5 py-3 font-semibold text-right">Total</th>
+									<th class="px-5 py-3 font-semibold text-center">Status</th>
+									<th class="px-5 py-3 font-semibold text-right">Aksi</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-[#E5E5EA] text-sm">
+								<template x-for="s in filteredRecentSales" :key="s.id">
+									<tr class="hover:bg-[#F5F5F7]/50 transition">
+										<td class="px-5 py-3 font-mono font-bold text-[#007AFF]" x-text="s.invoice_no"></td>
+										<td class="px-5 py-3 font-medium text-[#1D1D1F]" x-text="s.customer_name"></td>
+										<td class="px-5 py-3 capitalize text-xs text-gray-600" x-text="s.payment_method"></td>
+										<td class="px-5 py-3 text-right font-bold text-[#1D1D1F] tabular-nums" x-text="'Rp ' + formatRupiah(s.total_amount)"></td>
+										<td class="px-5 py-3 text-center">
+											<template x-if="s.status === 'sukses'">
+												<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-[#34C759] border border-green-200">
+													Sukses
+												</span>
+											</template>
+											<template x-if="s.status === 'batal'">
+												<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-[#FF3B30] border border-red-200">
+													Batal (Void)
+												</span>
+											</template>
+										</td>
+										<td class="px-5 py-3 text-right space-x-1.5 whitespace-nowrap">
+											<a
+												:href="'/sales/' + s.id + '/receipt'"
+												target="_blank"
+												class="inline-flex items-center justify-center min-h-[32px] px-2.5 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] text-xs font-medium transition"
+												title="Cetak Ulang Struk"
+											>
+												Cetak
+											</a>
+											<template x-if="s.status === 'sukses'">
+												<button
+													@click="voidSaleFromPOS(s)"
+													type="button"
+													class="inline-flex items-center justify-center min-h-[32px] px-2.5 rounded-lg bg-[#FF3B30]/10 hover:bg-[#FF3B30]/20 text-[#FF3B30] text-xs font-semibold transition"
+													title="Batalkan transaksi ini dan kembalikan stok fisik"
+												>
+													Void
+												</button>
+											</template>
+										</td>
+									</tr>
+								</template>
+								<template x-if="filteredRecentSales.length === 0">
+									<tr>
+										<td colspan="6" class="px-5 py-8 text-center text-[#8E8E93] text-sm">
+											Belum ada transaksi penjualan pada hari ini.
+										</td>
+									</tr>
+								</template>
+							</tbody>
+						</table>
+					</div>
+					<div class="p-4 border-t border-[#E5E5EA] bg-white flex justify-end">
+						<button
+							@click="showRecentSalesModal = false; $refs.searchInput.focus()"
+							class="min-h-[40px] px-5 bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] font-semibold text-xs rounded-xl transition"
+						>
+							Tutup (Esc)
+						</button>
+					</div>
+				</div>
+			</div>
+			<div
+				x-show="showShortcutModal"
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/40 backdrop-blur-xs"
+			>
+				<div
+					@click.away="showShortcutModal = false"
+					class="bg-white rounded-2xl shadow-xl border border-[#E5E5EA] w-full max-w-md p-6 space-y-4"
+				>
+					<div class="flex justify-between items-center border-b border-[#E5E5EA] pb-3">
+						<div>
+							<h3 class="text-lg font-bold text-[#1D1D1F]">Shortcut Keyboard Kasir</h3>
+							<p class="text-xs text-[#8E8E93]">Gunakan tombol shortcut untuk transaksi cepat tanpa mouse</p>
+						</div>
+						<button @click="showShortcutModal = false" class="text-[#8E8E93] hover:text-[#1D1D1F]">
+							<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<div class="space-y-2.5 text-sm">
+						<div class="flex items-center justify-between p-2 rounded-xl bg-[#F5F5F7]">
+							<span class="text-gray-700 font-medium">Bantuan Shortcut Ini</span>
+							<kbd class="px-2.5 py-1 bg-white border border-[#E5E5EA] rounded-lg font-mono font-bold text-xs text-[#007AFF] shadow-2xs">F1</kbd>
+						</div>
+						<div class="flex items-center justify-between p-2 rounded-xl bg-[#F5F5F7]">
+							<span class="text-gray-700 font-medium">Fokus ke Cari / Scan Barcode</span>
+							<kbd class="px-2.5 py-1 bg-white border border-[#E5E5EA] rounded-lg font-mono font-bold text-xs text-[#007AFF] shadow-2xs">F2</kbd>
+						</div>
+						<div class="flex items-center justify-between p-2 rounded-xl bg-[#F5F5F7]">
+							<span class="text-gray-700 font-medium">Cari / Pilih Pelanggan</span>
+							<kbd class="px-2.5 py-1 bg-white border border-[#E5E5EA] rounded-lg font-mono font-bold text-xs text-[#007AFF] shadow-2xs">F3</kbd>
+						</div>
+						<div class="flex items-center justify-between p-2 rounded-xl bg-[#F5F5F7]">
+							<span class="text-gray-700 font-medium">Riwayat Transaksi & Fitur Void</span>
+							<kbd class="px-2.5 py-1 bg-white border border-[#E5E5EA] rounded-lg font-mono font-bold text-xs text-[#007AFF] shadow-2xs">F4</kbd>
+						</div>
+						<div class="flex items-center justify-between p-2 rounded-xl bg-[#F5F5F7]">
+							<span class="text-gray-700 font-medium">Ubah Diskon Nota</span>
+							<kbd class="px-2.5 py-1 bg-white border border-[#E5E5EA] rounded-lg font-mono font-bold text-xs text-[#007AFF] shadow-2xs">F7</kbd>
+						</div>
+						<div class="flex items-center justify-between p-2 rounded-xl bg-[#F5F5F7]">
+							<span class="text-gray-700 font-medium">Kosongkan Keranjang</span>
+							<kbd class="px-2.5 py-1 bg-white border border-[#E5E5EA] rounded-lg font-mono font-bold text-xs text-[#FF3B30] shadow-2xs">F8</kbd>
+						</div>
+						<div class="flex items-center justify-between p-2 rounded-xl bg-[#F5F5F7]">
+							<span class="text-gray-700 font-medium">Bayar / Buka Pembayaran</span>
+							<kbd class="px-2.5 py-1 bg-white border border-[#E5E5EA] rounded-lg font-mono font-bold text-xs text-[#34C759] shadow-2xs">F9</kbd>
+						</div>
+						<div class="flex items-center justify-between p-2 rounded-xl bg-[#F5F5F7]">
+							<span class="text-gray-700 font-medium">Tambah Item / Konfirmasi Bayar</span>
+							<kbd class="px-2.5 py-1 bg-white border border-[#E5E5EA] rounded-lg font-mono font-bold text-xs text-[#1D1D1F] shadow-2xs">Enter</kbd>
+						</div>
+						<div class="flex items-center justify-between p-2 rounded-xl bg-[#F5F5F7]">
+							<span class="text-gray-700 font-medium">Tutup Modal / Batal</span>
+							<kbd class="px-2.5 py-1 bg-white border border-[#E5E5EA] rounded-lg font-mono font-bold text-xs text-[#8E8E93] shadow-2xs">Esc</kbd>
+						</div>
+					</div>
+					<div class="pt-2">
+						<button
+							@click="showShortcutModal = false"
+							class="w-full min-h-[44px] bg-[#007AFF] text-white rounded-xl font-bold text-sm hover:bg-[#0066D6] transition shadow-xs"
+						>
+							Tutup Bantuan
+						</button>
+					</div>
+				</div>
+			</div>
+			<div
+				x-show="showPaymentModal"
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/40 backdrop-blur-xs"
+				@keydown.enter.window="if (showPaymentModal && !kasbonCustomerDropdownOpen && !showReceiptModal && !isSubmitting) { $event.preventDefault(); submitCheckout(); }"
+			>
+				<div
+					@click.away="showPaymentModal = false"
+					class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+				>
+					<div class="p-5 border-b border-[#E5E5EA] flex justify-between items-center bg-[#F5F5F7]/60">
+						<div>
+							<span class="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider">Konfirmasi Pembayaran</span>
+							<h3 class="text-xl font-bold text-[#1D1D1F]">Pilih Metode Pembayaran</h3>
+						</div>
+						<button @click="showPaymentModal = false" class="min-w-[36px] min-h-[36px] inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5">
+							<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<div class="p-6 overflow-y-auto space-y-5">
+						<div class="bg-gradient-to-br from-[#007AFF]/10 to-[#007AFF]/5 rounded-2xl p-4 border border-[#007AFF]/20 text-center">
+							<span class="text-xs font-medium text-[#007AFF] uppercase tracking-wider">Total yang Harus Dibayar</span>
+							<h2 class="text-3xl font-black text-[#007AFF] tabular-nums mt-1" x-text="formatRupiah(calculateGrandTotal())"></h2>
+						</div>
+						<div class="grid grid-cols-4 gap-2">
+							<button
+								type="button"
+								@click="paymentMethod = 'tunai'; paidAmount = calculateGrandTotal(); $nextTick(() => { $refs.cashPaidInput?.focus(); $refs.cashPaidInput?.select(); })"
+								class="min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center gap-1 border"
+								:class="paymentMethod === 'tunai' ? 'bg-[#007AFF] text-white border-[#007AFF] shadow-xs' : 'bg-[#F5F5F7] text-[#1D1D1F] border-transparent hover:bg-[#E5E5EA]'"
+							>
+								<span>Tunai (Cash)</span>
+							</button>
+							<button
+								type="button"
+								@click="paymentMethod = 'transfer'; paidAmount = calculateGrandTotal()"
+								class="min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center gap-1 border"
+								:class="paymentMethod === 'transfer' ? 'bg-[#007AFF] text-white border-[#007AFF] shadow-xs' : 'bg-[#F5F5F7] text-[#1D1D1F] border-transparent hover:bg-[#E5E5EA]'"
+							>
+								<span>Transfer Bank</span>
+							</button>
+							<button
+								type="button"
+								@click="paymentMethod = 'qris'; paidAmount = calculateGrandTotal()"
+								class="min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center gap-1 border"
+								:class="paymentMethod === 'qris' ? 'bg-[#007AFF] text-white border-[#007AFF] shadow-xs' : 'bg-[#F5F5F7] text-[#1D1D1F] border-transparent hover:bg-[#E5E5EA]'"
+							>
+								<span>QRIS</span>
+							</button>
+							<button
+								type="button"
+								@click="selectKasbonPayment()"
+								class="min-h-[44px] py-2 px-1 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center gap-0.5 border"
+								:class="paymentMethod === 'kasbon' ? 'bg-[#FF9500] text-white border-[#FF9500] shadow-xs' : 'bg-[#F5F5F7] text-[#1D1D1F] border-transparent hover:bg-[#E5E5EA]'"
+							>
+								<span>Kasbon (Hutang)</span>
+								<template x-if="!selectedCustomerId">
+									<span class="text-[9px] font-normal" :class="paymentMethod === 'kasbon' ? 'text-amber-100' : 'text-[#8E8E93]'">Pilih Pelanggan</span>
+								</template>
+								<template x-if="selectedCustomerId">
+									<span class="text-[9px] font-normal truncate max-w-[85px]" :class="paymentMethod === 'kasbon' ? 'text-amber-100' : 'text-[#007AFF]'" x-text="selectedCustomerName"></span>
+								</template>
+							</button>
+						</div>
+						<template x-if="paymentMethod === 'tunai'">
+							<div class="space-y-3">
+								<div>
+									<label class="block text-xs font-medium text-[#1D1D1F] mb-1">Nominal Uang Diterima (Rp)</label>
+									<input
+										type="number"
+										min="0"
+										x-ref="cashPaidInput"
+										x-model.number="paidAmount"
+										@click="$event.target.select()"
+										@focus="$event.target.select()"
+										@keydown.enter.prevent="submitCheckout()"
+										class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-4 min-h-[48px] text-xl font-bold text-[#1D1D1F] focus:bg-white focus:border-[#007AFF] outline-none tabular-nums"
+										placeholder="0"
+									/>
+								</div>
+								<div class="grid grid-cols-4 gap-2">
+									<button
+										@click="paidAmount = calculateGrandTotal(); $refs.cashPaidInput?.focus(); $refs.cashPaidInput?.select()"
+										type="button"
+										class="col-span-2 py-2 px-2 rounded-xl bg-[#007AFF]/10 hover:bg-[#007AFF]/20 text-xs font-bold text-[#007AFF] transition min-h-[38px] flex items-center justify-center gap-1.5 shadow-2xs"
+									>
+										<span>Uang Pas</span>
+										<span class="text-[11px] font-mono opacity-80" x-text="'(' + formatRupiah(calculateGrandTotal()) + ')'"></span>
+									</button>
+									<button
+										@click="paidAmount = 2000; $refs.cashPaidInput?.focus(); $refs.cashPaidInput?.select()"
+										type="button"
+										class="py-2 px-2 rounded-xl bg-[#F5F5F7] hover:bg-[#E5E5EA] text-xs font-semibold text-[#1D1D1F] transition min-h-[38px]"
+									>
+										2.000
+									</button>
+									<button
+										@click="paidAmount = 5000; $refs.cashPaidInput?.focus(); $refs.cashPaidInput?.select()"
+										type="button"
+										class="py-2 px-2 rounded-xl bg-[#F5F5F7] hover:bg-[#E5E5EA] text-xs font-semibold text-[#1D1D1F] transition min-h-[38px]"
+									>
+										5.000
+									</button>
+									<button
+										@click="paidAmount = 10000; $refs.cashPaidInput?.focus(); $refs.cashPaidInput?.select()"
+										type="button"
+										class="py-2 px-2 rounded-xl bg-[#F5F5F7] hover:bg-[#E5E5EA] text-xs font-semibold text-[#1D1D1F] transition min-h-[38px]"
+									>
+										10.000
+									</button>
+									<button
+										@click="paidAmount = 20000; $refs.cashPaidInput?.focus(); $refs.cashPaidInput?.select()"
+										type="button"
+										class="py-2 px-2 rounded-xl bg-[#F5F5F7] hover:bg-[#E5E5EA] text-xs font-semibold text-[#1D1D1F] transition min-h-[38px]"
+									>
+										20.000
+									</button>
+									<button
+										@click="paidAmount = 50000; $refs.cashPaidInput?.focus(); $refs.cashPaidInput?.select()"
+										type="button"
+										class="py-2 px-2 rounded-xl bg-[#F5F5F7] hover:bg-[#E5E5EA] text-xs font-semibold text-[#1D1D1F] transition min-h-[38px]"
+									>
+										50.000
+									</button>
+									<button
+										@click="paidAmount = 100000; $refs.cashPaidInput?.focus(); $refs.cashPaidInput?.select()"
+										type="button"
+										class="py-2 px-2 rounded-xl bg-[#F5F5F7] hover:bg-[#E5E5EA] text-xs font-semibold text-[#1D1D1F] transition min-h-[38px]"
+									>
+										100.000
+									</button>
+								</div>
+								<div class="p-4 rounded-xl border" :class="paidAmount >= calculateGrandTotal() ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'">
+									<div class="flex justify-between items-center">
+										<span class="text-sm font-semibold" :class="paidAmount >= calculateGrandTotal() ? 'text-[#34C759]' : 'text-[#FF3B30]'">
+											<template x-if="paidAmount >= calculateGrandTotal()">
+												<span>Kembalian:</span>
+											</template>
+											<template x-if="paidAmount < calculateGrandTotal()">
+												<span>Kurang Bayar:</span>
+											</template>
+										</span>
+										<span class="text-2xl font-black tabular-nums" :class="paidAmount >= calculateGrandTotal() ? 'text-[#34C759]' : 'text-[#FF3B30]'" x-text="formatRupiah(Math.abs(paidAmount - calculateGrandTotal()))"></span>
+									</div>
+								</div>
+							</div>
+						</template>
+						<template x-if="paymentMethod === 'kasbon'">
+							<div class="space-y-3 bg-amber-50/50 p-4 rounded-2xl border border-amber-200/60">
+								<template x-if="!selectedCustomerId">
+									<div class="p-3 bg-amber-100/90 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-center justify-between gap-3 shadow-2xs">
+										<div class="flex items-center gap-2">
+											<svg class="w-5 h-5 text-amber-700 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"></path></svg>
+											<div>
+												<p class="font-bold text-amber-900">Pelanggan Walk-In Tidak Bisa Kasbon</p>
+												<p class="text-[11px] font-medium text-amber-800">Jika ingin kasbon, wajib pilih atau daftarkan pelanggan terlebih dahulu.</p>
+											</div>
+										</div>
+										<button
+											type="button"
+											@click="kasbonCustomerDropdownOpen = true"
+											class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex-shrink-0 shadow-xs"
+										>
+											Pilih Pelanggan
+										</button>
+									</div>
+								</template>
+								<div class="relative" @click.outside="kasbonCustomerDropdownOpen = false">
+									<div class="flex items-center justify-between mb-1">
+										<label class="block text-xs font-medium text-[#1D1D1F]">
+											Pelanggan Kasbon <span class="text-[#FF3B30]">*</span>
+										</label>
+										<span x-show="!selectedCustomerId" class="text-[11px] text-[#FF9500] font-semibold">Wajib dipilih</span>
+									</div>
+									<div class="flex items-center gap-2">
+										<button
+											type="button"
+											@click="kasbonCustomerDropdownOpen = !kasbonCustomerDropdownOpen"
+											class="flex-1 bg-white hover:bg-[#F5F5F7] border rounded-xl px-3 min-h-[44px] text-sm text-left flex items-center justify-between focus:ring-2 focus:ring-[#007AFF] outline-none transition"
+											:class="!selectedCustomerId ? 'border-amber-400 bg-amber-50/40 ring-2 ring-amber-400/20' : 'border-[#E5E5EA]'"
+										>
+											<div class="flex items-center gap-2 truncate">
+												<svg class="w-4 h-4 text-[#8E8E93] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"></path></svg>
+												<span class="truncate font-semibold" :class="selectedCustomerId ? 'text-[#1D1D1F]' : 'text-amber-800'" x-text="selectedCustomerId ? selectedCustomerName : '-- Klik Untuk Cari & Pilih Pelanggan --'"></span>
+											</div>
+											<svg class="w-4 h-4 text-[#8E8E93] flex-shrink-0 ml-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"></path></svg>
+										</button>
+										<template x-if="selectedCustomerId">
+											<button
+												type="button"
+												@click="selectCustomer(null)"
+												class="min-w-[36px] min-h-[44px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#FF3B30] hover:bg-red-50 rounded-xl transition"
+												title="Hapus Pilihan Pelanggan"
+											>
+												<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path></svg>
+											</button>
+										</template>
+										<a
+											href="/customers/new"
+											target="_blank"
+											title="Tambah Pelanggan Baru (Tab Baru)"
+											class="min-w-[44px] min-h-[44px] inline-flex items-center justify-center bg-white border border-[#E5E5EA] text-[#007AFF] hover:bg-[#007AFF]/10 rounded-xl transition"
+										>
+											<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z"></path></svg>
+										</a>
+									</div>
+									<div
+										x-show="kasbonCustomerDropdownOpen"
+										x-cloak
+										class="absolute left-0 right-0 z-30 mt-1.5 bg-white border border-[#E5E5EA] rounded-2xl shadow-xl p-2 space-y-1.5"
+									>
+										<div class="relative">
+											<input
+												type="text"
+												x-ref="kasbonCustomerSearchInput"
+												x-model="customerSearch"
+												@keydown.enter.stop.prevent="if (filteredCustomers.length > 0) selectCustomer(filteredCustomers[0])"
+												@keydown.escape.stop="kasbonCustomerDropdownOpen = false"
+												placeholder="Cari nama, telepon, atau alamat pelanggan..."
+												class="w-full pl-9 pr-3 py-2 bg-[#F5F5F7] rounded-xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-[#007AFF] transition"
+											/>
+											<svg class="w-4 h-4 text-[#8E8E93] absolute left-3 top-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path></svg>
+										</div>
+										<div class="max-h-56 overflow-y-auto divide-y divide-[#E5E5EA]/60">
+											<template x-for="c in filteredCustomers" :key="c.id">
+												<button
+													type="button"
+													@click="selectCustomer(c)"
+													class="w-full text-left px-3 py-2.5 rounded-xl text-sm hover:bg-[#007AFF]/10 flex items-center justify-between transition"
+												>
+													<div class="min-w-0 pr-2">
+														<span :class="selectedCustomerId === c.id ? 'font-bold text-[#007AFF]' : 'font-medium text-[#1D1D1F]'" x-text="c.name"></span>
+														<div class="flex items-center gap-2 text-[11px] text-[#8E8E93] mt-0.5 truncate">
+															<span x-show="getCustomerPhone(c)" x-text="getCustomerPhone(c)"></span>
+															<span x-show="getCustomerAddress(c)" x-text="getCustomerAddress(c)" class="truncate"></span>
+														</div>
+													</div>
+													<svg x-show="selectedCustomerId === c.id" class="w-4 h-4 text-[#007AFF] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path></svg>
+												</button>
+											</template>
+											<div x-show="filteredCustomers.length === 0" class="px-3 py-4 text-xs text-[#8E8E93] text-center">
+												<p>Pelanggan tidak ditemukan.</p>
+												<a href="/customers/new" target="_blank" class="text-[#007AFF] font-semibold hover:underline mt-1 inline-block">+ Tambah Pelanggan Baru</a>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div>
+									<label class="block text-xs font-medium text-[#1D1D1F] mb-1">Batas Jatuh Tempo</label>
+									<input
+										type="date"
+										x-model="dueDate"
+										@keydown.enter.prevent="submitCheckout()"
+										class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] text-sm text-[#1D1D1F] outline-none"
+									/>
+								</div>
+								<div>
+									<label class="block text-xs font-medium text-[#1D1D1F] mb-1">Uang Muka / DP (Opsional)</label>
+									<input
+										type="number"
+										min="0"
+										x-model.number="paidAmount"
+										@keydown.enter.prevent="submitCheckout()"
+										placeholder="0"
+										class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] text-sm font-semibold text-[#1D1D1F] outline-none tabular-nums"
+									/>
+									<span class="text-xs text-[#8E8E93] mt-1 block" x-text="'Sisa Hutang: Rp ' + formatRupiah(Math.max(0, calculateGrandTotal() - paidAmount))"></span>
+								</div>
+							</div>
+						</template>
+						<div>
+							<label class="block text-xs font-medium text-[#1D1D1F] mb-1">Catatan Transaksi (Opsional)</label>
+							<input
+								type="text"
+								x-model="notes"
+								@keydown.enter.prevent="submitCheckout()"
+								placeholder="Misal: Nomor nota manual / keterangan pesanan"
+								class="w-full bg-[#F5F5F7] border border-transparent rounded-xl px-3 min-h-[40px] text-xs text-[#1D1D1F] focus:bg-white focus:border-[#007AFF] outline-none"
+							/>
+						</div>
+					</div>
+					<div class="p-4 sm:p-5 border-t border-[#E5E5EA] bg-white flex gap-3 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] sm:pb-5">
+						<button
+							@click="showPaymentModal = false"
+							type="button"
+							class="flex-1 min-h-[48px] rounded-xl border border-[#E5E5EA] font-semibold text-[#1D1D1F] hover:bg-[#F5F5F7] transition"
+						>
+							Batal (Esc)
+						</button>
+						<button
+							@click="submitCheckout()"
+							:disabled="isSubmitting || (paymentMethod === 'tunai' && paidAmount < calculateGrandTotal()) || (paymentMethod === 'kasbon' && !selectedCustomerId)"
+							type="button"
+							class="flex-2 min-h-[48px] rounded-xl bg-[#34C759] text-white font-bold hover:bg-[#2EB04F] disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md flex items-center justify-center gap-2"
+						>
+							<template x-if="isSubmitting">
+								<span>Memproses Transaksi...</span>
+							</template>
+							<template x-if="!isSubmitting">
+								<span>Selesaikan Transaksi (Enter)</span>
+							</template>
+						</button>
+					</div>
+				</div>
+			</div>
+			<div
+				x-show="showReceiptModal"
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/50 backdrop-blur-xs"
+			>
+				<div class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-sm overflow-hidden flex flex-col p-6 space-y-4">
+					<div class="text-center">
+						<div class="w-12 h-12 bg-green-100 text-[#34C759] rounded-full mx-auto flex items-center justify-center mb-2">
+							<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path></svg>
+						</div>
+						<h3 class="text-xl font-bold text-[#1D1D1F]">Transaksi Berhasil!</h3>
+						<p class="text-xs text-[#8E8E93]" x-text="'No. Nota: ' + lastCompletedInvoice"></p>
+					</div>
+					<template x-if="lastCompletedPaymentMethod === 'kasbon'">
+						<div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-left space-y-1">
+							<div class="flex justify-between text-xs text-amber-900 font-medium">
+								<span>Metode:</span>
+								<span class="font-bold uppercase">Kasbon (Hutang)</span>
+							</div>
+							<div class="flex justify-between text-xs text-amber-800" x-show="lastCompletedPaidAmount > 0">
+								<span>Uang Muka (DP):</span>
+								<span class="font-semibold tabular-nums" x-text="'Rp ' + formatRupiah(lastCompletedPaidAmount)"></span>
+							</div>
+							<div class="flex justify-between text-xs text-amber-950 font-bold border-t border-amber-200/60 pt-1">
+								<span>Sisa Kurang:</span>
+								<span class="text-red-600 tabular-nums" x-text="'Rp ' + formatRupiah(Math.max(0, lastCompletedTotal - lastCompletedPaidAmount))"></span>
+							</div>
+						</div>
+					</template>
+					<div class="border-t border-[#E5E5EA] pt-3 space-y-2 text-left">
+						<template x-if="waAutoSent && !showManualWA">
+							<div class="bg-[#25D366]/10 border border-[#25D366]/30 rounded-xl p-3 flex items-center justify-between gap-2.5">
+								<div class="flex items-center gap-2.5 min-w-0">
+									<div class="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+										<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.173.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.176.582 4.217 1.597 5.975l-1.605 5.869 6.046-1.587c1.705.938 3.665 1.473 5.751 1.473 6.627 0 12-5.373 12-12 0-6.628-5.373-12-11.789-12z"></path></svg>
+									</div>
+									<div class="truncate">
+										<p class="text-xs font-bold text-gray-900 flex items-center gap-1">
+											<span>Nota Terkirim ke WhatsApp</span>
+											<span class="text-[#34C759]">✓</span>
+										</p>
+										<p class="text-[11px] text-green-700 font-semibold truncate" x-text="'No. HP: ' + receiptWAPhone"></p>
+									</div>
+								</div>
+								<button
+									type="button"
+									@click="if (waCooldown === 0) showManualWA = true"
+									:disabled="waCooldown > 0"
+									class="px-2.5 py-1 text-[11px] font-semibold text-[#007AFF] hover:bg-[#007AFF]/10 disabled:opacity-40 disabled:hover:bg-transparent rounded-lg transition whitespace-nowrap flex-shrink-0 cursor-pointer disabled:cursor-not-allowed"
+								>
+									<span x-text="waCooldown > 0 ? 'Tunggu (' + waCooldown + 's)' : 'Kirim Ulang'"></span>
+								</button>
+							</div>
+						</template>
+						<template x-if="!waAutoSent || showManualWA">
+							<div class="space-y-2">
+								<div class="flex items-center justify-between">
+									<span class="text-xs font-semibold text-[#1D1D1F] flex items-center gap-1.5">
+										<svg class="w-4 h-4 fill-current text-[#25D366]" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.173.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.176.582 4.217 1.597 5.975l-1.605 5.869 6.046-1.587c1.705.938 3.665 1.473 5.751 1.473 6.627 0 12-5.373 12-12 0-6.628-5.373-12-11.789-12z"></path></svg>
+										<span x-text="waAutoSent ? 'Kirim Ulang ke WhatsApp:' : 'Kirim Nota ke WhatsApp:'"></span>
+									</span>
+									<template x-if="waAutoSent">
+										<button type="button" @click="showManualWA = false" class="text-[11px] text-[#8E8E93] hover:underline">Batal</button>
+									</template>
+								</div>
+								<div class="flex gap-1.5">
+									<input
+										type="text"
+										x-model="receiptWAPhone"
+										placeholder="08xxxxxxxxxx"
+										class="flex-1 bg-[#F5F5F7] border border-transparent rounded-xl px-3 py-2 text-xs outline-none focus:bg-white focus:border-[#25D366] tabular-nums"
+									/>
+									<button
+										type="button"
+										@click="sendReceiptToWhatsApp()"
+										:disabled="isSendingWA || waCooldown > 0"
+										class="px-3 min-h-[38px] bg-[#25D366] hover:bg-[#1EBE5D] text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-2xs disabled:opacity-50"
+									>
+										<svg x-show="!isSendingWA && waCooldown === 0" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"></path></svg>
+										<span x-text="isSendingWA ? 'Mengirim...' : (waCooldown > 0 ? 'Tunggu (' + waCooldown + 's)' : (waAutoSent ? 'Kirim Ulang' : 'Kirim'))"></span>
+									</button>
+								</div>
+								<template x-if="waSendSuccess">
+									<p class="text-[11px] text-[#34C759] font-medium" x-text="waSendSuccess"></p>
+								</template>
+								<template x-if="waSendError">
+									<p class="text-[11px] text-[#FF3B30] font-medium" x-text="waSendError"></p>
+								</template>
+							</div>
+						</template>
+					</div>
+					<div class="flex gap-2">
+						<a
+							:href="'/sales/' + lastCompletedSaleId + '/receipt'"
+							target="_blank"
+							class="flex-1 min-h-[44px] bg-[#007AFF] text-white font-semibold rounded-xl inline-flex items-center justify-center gap-2 hover:bg-[#0066D6] transition shadow-xs text-sm"
+						>
+							<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.079.766-2.013 1.833-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z"></path></svg>
+							<span>Cetak Struk</span>
+						</a>
+						<button
+							@click="showReceiptModal = false; $refs.searchInput.focus()"
+							class="flex-1 min-h-[44px] bg-[#F5F5F7] text-[#1D1D1F] font-semibold rounded-xl inline-flex items-center justify-center hover:bg-[#E5E5EA] transition text-sm"
+						>
+							Transaksi Baru
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<script>
+		function posApp(config) {
+			return {
+				products: config.rawProducts || [],
+				units: config.rawUnits || [],
+				categories: config.rawCategories || [],
+				customers: config.rawCustomers || [],
+				recentSales: config.rawRecentSales || [],
+				invoiceNo: config.initialInvoiceNo || 'TRX-0001',
+				
+				currentTime: new Date().toLocaleTimeString('id-ID'),
+				searchQuery: '',
+				recentSalesQuery: '',
+				selectedCategory: 0,
+				cart: [],
+				posView: 'catalog',
+				discountAmount: 0,
+				selectedCustomerId: '',
+				sidebarOpen: false,
+				sidebarFolded: false,
+				customerDropdownOpen: false,
+				kasbonCustomerDropdownOpen: false,
+				customerSearch: '',
+				paymentMethod: 'tunai',
+				paidAmount: 0,
+				dueDate: new Date(Date.now() + 14*24*60*60*1000).toISOString().split('T')[0],
+				notes: '',
+
+				showShortcutModal: false,
+				showRecentSalesModal: false,
+				showOpenPriceModal: false,
+				openPriceItem: { product_id: 0, name: '', unit_id: 0, unit_name: '', conversion_qty: 1, qty: 1, price: 0, subtotal: 0, cartIdx: -1 },
+				showItemDiscountModal: false,
+				discountItem: { cartIdx: -1, name: '', unit_name: '', qty: 1, price: 0, grossTotal: 0, discount: 0, netSubtotal: 0 },
+				
+				showPaymentModal: false,
+				showReceiptModal: false,
+				lastCompletedSaleId: 0,
+				lastCompletedInvoice: '',
+				lastCompletedPaymentMethod: '',
+				lastCompletedTotal: 0,
+				lastCompletedPaidAmount: 0,
+				isSubmitting: false,
+				receiptWAPhone: '',
+				isSendingWA: false,
+				waSendSuccess: '',
+				waSendError: '',
+				waCooldown: 0,
+				waCooldownTimer: null,
+				waAutoSent: false,
+				showManualWA: false,
+
+				init() {
+					setInterval(() => {
+						this.currentTime = new Date().toLocaleTimeString('id-ID') + ' WITA';
+					}, 1000);
+
+					this.$watch('customerDropdownOpen', value => {
+						if (value) {
+							this.customerSearch = '';
+							this.$nextTick(() => {
+								this.$refs.customerSearchInput?.focus();
+								setTimeout(() => {
+									this.$refs.customerSearchInput?.focus();
+									this.$refs.customerSearchInput?.select();
+								}, 50);
+							});
+						}
+					});
+
+					this.$watch('kasbonCustomerDropdownOpen', value => {
+						if (value) {
+							this.customerSearch = '';
+							this.$nextTick(() => {
+								this.$refs.kasbonCustomerSearchInput?.focus();
+								setTimeout(() => {
+									this.$refs.kasbonCustomerSearchInput?.focus();
+									this.$refs.kasbonCustomerSearchInput?.select();
+								}, 50);
+							});
+						}
+					});
+				},
+
+				get selectedCustomer() {
+					if (!this.selectedCustomerId) return null;
+					return this.customers.find(c => c.id === parseInt(this.selectedCustomerId)) || null;
+				},
+
+				get selectedCustomerName() {
+					let c = this.selectedCustomer;
+					return c ? c.name : 'Pelanggan Umum (Walk-in)';
+				},
+
+				getCustomerPhone(c) {
+					if (!c) return '';
+					if (typeof c.phone === 'string') return c.phone;
+					if (c.phone && c.phone.String && c.phone.Valid) return c.phone.String;
+					return '';
+				},
+
+				getCustomerAddress(c) {
+					if (!c) return '';
+					if (typeof c.address === 'string') return c.address;
+					if (c.address && c.address.String && c.address.Valid) return c.address.String;
+					return '';
+				},
+
+				get filteredCustomers() {
+					let q = this.customerSearch.toLowerCase().trim();
+					if (!q) return this.customers;
+					return this.customers.filter(c => {
+						let nameMatch = c.name && c.name.toLowerCase().includes(q);
+						let phoneMatch = this.getCustomerPhone(c).toLowerCase().includes(q);
+						let addrMatch = this.getCustomerAddress(c).toLowerCase().includes(q);
+						return nameMatch || phoneMatch || addrMatch;
+					});
+				},
+
+				selectCustomer(c) {
+					if (!c) {
+						this.selectedCustomerId = '';
+						if (this.paymentMethod === 'kasbon') {
+							this.paymentMethod = 'tunai';
+							this.paidAmount = this.calculateGrandTotal();
+						}
+					} else {
+						this.selectedCustomerId = c.id;
+					}
+					this.customerDropdownOpen = false;
+					this.kasbonCustomerDropdownOpen = false;
+					this.customerSearch = '';
+				},
+
+				selectKasbonPayment() {
+					this.paymentMethod = 'kasbon';
+					this.paidAmount = 0;
+					if (!this.selectedCustomerId) {
+						this.kasbonCustomerDropdownOpen = true;
+					}
+				},
+
+				openCustomerDropdown() {
+					this.customerDropdownOpen = true;
+				},
+
+				get filteredProducts() {
+					let q = this.searchQuery.toLowerCase().trim();
+					return this.products.filter(p => {
+						let matchCat = this.selectedCategory === 0 || p.category_id === this.selectedCategory;
+						let matchQuery = !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q);
+						return matchCat && matchQuery;
+					});
+				},
+
+				get filteredRecentSales() {
+					let q = this.recentSalesQuery.toLowerCase().trim();
+					return this.recentSales.filter(s => {
+						return !q || s.invoice_no.toLowerCase().includes(q) || (s.customer_name && s.customer_name.toLowerCase().includes(q));
+					});
+				},
+
+				getProductUnits(productId) {
+					return this.units.filter(u => u.product_id === productId);
+				},
+
+				handleBarcodeScan() {
+					let q = this.searchQuery.toLowerCase().trim();
+					if (!q) return;
+
+					let exactMatch = this.products.find(p => p.sku.toLowerCase() === q);
+					if (exactMatch) {
+						let u = this.getProductUnits(exactMatch.id)[0];
+						if (u) {
+							this.addToCart(exactMatch, u);
+							this.searchQuery = '';
+							return;
+						}
+					}
+
+					let results = this.filteredProducts;
+					if (results.length === 1) {
+						let u = this.getProductUnits(results[0].id)[0];
+						if (u) {
+							this.addToCart(results[0], u);
+							this.searchQuery = '';
+						}
+					}
+				},
+
+				addToCart(product, unit) {
+					if (product.is_open_price) {
+						this.openPriceItem = {
+							product_id: product.id,
+							sku: product.sku || '',
+							name: product.name,
+							unit_id: unit.id,
+							unit_name: unit.unit_name,
+							conversion_qty: unit.conversion_qty,
+							qty: 1,
+							price: parseFloat(unit.price) || 0,
+							subtotal: parseFloat(unit.price) || 0,
+							cartIdx: -1
+						};
+						this.showOpenPriceModal = true;
+						this.$nextTick(() => {
+							this.$refs.openPriceInput?.focus();
+							this.$refs.openPriceInput?.select();
+						});
+						return;
+					}
+
+					let existing = this.cart.find(it => it.product_id === product.id && it.unit_id === unit.id);
+					if (existing) {
+						existing.qty += 1;
+						let gross = existing.qty * existing.price;
+						existing.discount = Math.min(existing.discount || 0, gross);
+						existing.subtotal = Math.max(0, gross - (existing.discount || 0));
+					} else {
+						let price = parseFloat(unit.price) || 0;
+						this.cart.push({
+							product_id: product.id,
+							sku: product.sku,
+							name: product.name,
+							type: product.type,
+							is_open_price: !!product.is_open_price,
+							unit_id: unit.id,
+							unit_name: unit.unit_name,
+							conversion_qty: unit.conversion_qty,
+							qty: 1,
+							price: price,
+							discount: 0,
+							subtotal: price
+						});
+					}
+				},
+
+				updateQty(idx, delta) {
+					let it = this.cart[idx];
+					if (!it) return;
+					it.qty += delta;
+					if (it.qty <= 0) {
+						this.cart.splice(idx, 1);
+					} else {
+						let gross = it.qty * it.price;
+						it.discount = Math.min(it.discount || 0, gross);
+						it.subtotal = Math.max(0, gross - (it.discount || 0));
+					}
+				},
+
+				setQty(idx, val) {
+					let it = this.cart[idx];
+					if (!it) return;
+					let q = parseInt(val) || 1;
+					if (q <= 0) {
+						this.cart.splice(idx, 1);
+					} else {
+						it.qty = q;
+						let gross = it.qty * it.price;
+						it.discount = Math.min(it.discount || 0, gross);
+						it.subtotal = Math.max(0, gross - (it.discount || 0));
+					}
+				},
+
+				changeUnit(idx, newUnitId) {
+					let it = this.cart[idx];
+					if (!it) return;
+					let u = this.units.find(unit => unit.id === parseInt(newUnitId));
+					if (u) {
+						it.unit_id = u.id;
+						it.unit_name = u.unit_name;
+						it.conversion_qty = u.conversion_qty;
+						it.price = parseFloat(u.price) || 0;
+						let gross = it.qty * it.price;
+						it.discount = Math.min(it.discount || 0, gross);
+						it.subtotal = Math.max(0, gross - (it.discount || 0));
+					}
+				},
+
+				removeFromCart(idx) {
+					this.cart.splice(idx, 1);
+				},
+
+				clearCart() {
+					if (this.cart.length > 0 && !confirm('Yakin ingin mengosongkan keranjang kasir?')) {
+						return;
+					}
+					this.cart = [];
+					this.discountAmount = 0;
+					this.posView = 'catalog';
+				},
+
+				editItemPrice(idx) {
+					let it = this.cart[idx];
+					if (!it || !it.is_open_price) return;
+					this.openPriceItem = {
+						product_id: it.product_id,
+						sku: it.sku || '',
+						name: it.name,
+						unit_id: it.unit_id,
+						unit_name: it.unit_name,
+						conversion_qty: it.conversion_qty,
+						qty: it.qty,
+						price: it.price,
+						subtotal: it.subtotal,
+						cartIdx: idx
+					};
+					this.showOpenPriceModal = true;
+					this.$nextTick(() => {
+						this.$refs.openPriceInput?.focus();
+						this.$refs.openPriceInput?.select();
+					});
+				},
+
+				onOpenPriceQtyChange() {
+					this.openPriceItem.qty = Math.max(1, parseInt(this.openPriceItem.qty) || 1);
+					this.openPriceItem.subtotal = Math.round(this.openPriceItem.qty * (parseFloat(this.openPriceItem.price) || 0));
+				},
+
+				onOpenPricePriceChange() {
+					let p = parseFloat(this.openPriceItem.price) || 0;
+					this.openPriceItem.subtotal = Math.round(this.openPriceItem.qty * p);
+				},
+
+				onOpenPriceSubtotalChange() {
+					let sub = parseFloat(this.openPriceItem.subtotal) || 0;
+					if (this.openPriceItem.qty > 0) {
+						this.openPriceItem.price = Math.round(sub / this.openPriceItem.qty);
+					}
+				},
+
+				saveOpenPriceItem() {
+					let q = Math.max(1, parseInt(this.openPriceItem.qty) || 1);
+					let sub = Math.max(0, parseFloat(this.openPriceItem.subtotal) || 0);
+					let pr = q > 0 ? (sub / q) : 0;
+
+					if (this.openPriceItem.cartIdx >= 0) {
+						let it = this.cart[this.openPriceItem.cartIdx];
+						it.qty = q;
+						it.price = pr;
+						let gross = it.qty * it.price;
+						it.discount = Math.min(it.discount || 0, gross);
+						it.subtotal = Math.max(0, gross - (it.discount || 0));
+						it.is_open_price = true;
+					} else {
+						this.cart.push({
+							product_id: this.openPriceItem.product_id,
+							sku: this.openPriceItem.sku || '',
+							name: this.openPriceItem.name,
+							type: 'jasa',
+							is_open_price: true,
+							unit_id: this.openPriceItem.unit_id,
+							unit_name: this.openPriceItem.unit_name,
+							conversion_qty: this.openPriceItem.conversion_qty,
+							qty: q,
+							price: pr,
+							discount: 0,
+							subtotal: sub
+						});
+					}
+					this.showOpenPriceModal = false;
+				},
+
+				openItemDiscountModal(idx) {
+					let it = this.cart[idx];
+					if (!it) return;
+					let gross = Math.round(it.qty * it.price);
+					let disc = Math.min(it.discount || 0, gross);
+					this.discountItem = {
+						cartIdx: idx,
+						name: it.name,
+						unit_name: it.unit_name,
+						qty: it.qty,
+						price: it.price,
+						grossTotal: gross,
+						discount: disc,
+						netSubtotal: Math.max(0, gross - disc)
+					};
+					this.showItemDiscountModal = true;
+					this.$nextTick(() => {
+						this.$refs.itemDiscountInput?.focus();
+						this.$refs.itemDiscountInput?.select();
+					});
+				},
+
+				onItemDiscountChange() {
+					let d = Math.max(0, parseFloat(this.discountItem.discount) || 0);
+					if (d > this.discountItem.grossTotal) {
+						d = this.discountItem.grossTotal;
+						this.discountItem.discount = d;
+					}
+					this.discountItem.netSubtotal = Math.max(0, this.discountItem.grossTotal - d);
+				},
+
+				applyItemDiscountPreset(val) {
+					let target = Math.min(val, this.discountItem.grossTotal);
+					this.discountItem.discount = target;
+					this.onItemDiscountChange();
+				},
+
+				saveItemDiscount() {
+					if (this.discountItem.cartIdx >= 0 && this.cart[this.discountItem.cartIdx]) {
+						let it = this.cart[this.discountItem.cartIdx];
+						let disc = Math.max(0, parseFloat(this.discountItem.discount) || 0);
+						let gross = it.qty * it.price;
+						disc = Math.min(disc, gross);
+						it.discount = disc;
+						it.subtotal = Math.max(0, gross - disc);
+					}
+					this.showItemDiscountModal = false;
+				},
+
+				removeItemDiscount() {
+					if (this.discountItem.cartIdx >= 0 && this.cart[this.discountItem.cartIdx]) {
+						let it = this.cart[this.discountItem.cartIdx];
+						it.discount = 0;
+						it.subtotal = it.qty * it.price;
+					}
+					this.showItemDiscountModal = false;
+				},
+
+				calculateGrossTotal() {
+					return this.cart.reduce((sum, item) => sum + ((parseFloat(item.subtotal) || 0) + (parseFloat(item.discount) || 0)), 0);
+				},
+
+				calculateTotalItemDiscount() {
+					return this.cart.reduce((sum, item) => sum + (parseFloat(item.discount) || 0), 0);
+				},
+
+				calculateSubtotal() {
+					return this.cart.reduce((sum, item) => sum + item.subtotal, 0);
+				},
+
+				calculateGrandTotal() {
+					let sub = this.calculateSubtotal();
+					let disc = parseFloat(this.discountAmount) || 0;
+					return Math.max(0, sub - disc);
+				},
+
+				openPaymentModal() {
+					if (this.cart.length === 0) return;
+					let total = this.calculateGrandTotal();
+					if (this.paymentMethod === 'kasbon' && !this.selectedCustomerId) {
+						this.paymentMethod = 'tunai';
+					}
+					if (this.paymentMethod === 'tunai' || this.paymentMethod === 'transfer' || this.paymentMethod === 'qris') {
+						this.paidAmount = total;
+					} else {
+						this.paidAmount = 0;
+					}
+					this.showPaymentModal = true;
+					this.$nextTick(() => {
+						if (this.paymentMethod === 'tunai') {
+							this.$refs.cashPaidInput?.focus();
+							this.$refs.cashPaidInput?.select();
+						}
+					});
+				},
+
+				openRecentSalesModal() {
+					this.recentSalesQuery = '';
+					this.showRecentSalesModal = true;
+				},
+
+				closeModals() {
+					this.sidebarOpen = false;
+					this.customerDropdownOpen = false;
+					this.kasbonCustomerDropdownOpen = false;
+					this.showShortcutModal = false;
+					this.showRecentSalesModal = false;
+					this.showPaymentModal = false;
+					this.showOpenPriceModal = false;
+					this.showItemDiscountModal = false;
+					this.showReceiptModal = false;
+				},
+
+				formatRupiah(num) {
+					return new Intl.NumberFormat('id-ID').format(Math.round(num || 0));
+				},
+
+				async voidSaleFromPOS(sale) {
+					if (!confirm(`PERINGATAN: Apakah Anda yakin ingin membatalkan transaksi ${sale.invoice_no}? Stok fisik barang akan otomatis dikembalikan ke inventori!`)) {
+						return;
+					}
+
+					try {
+						let res = await fetch(`/sales/${sale.id}/void`, { method: 'POST' });
+						if (res.ok) {
+							sale.status = 'batal';
+							alert(`Transaksi ${sale.invoice_no} berhasil dibatalkan dan stok produk telah dipulihkan.`);
+						} else {
+							alert('Gagal membatalkan transaksi.');
+						}
+					} catch(e) {
+						alert('Terjadi kesalahan jaringan: ' + e.message);
+					}
+				},
+
+				async submitCheckout() {
+					if (this.isSubmitting) return;
+					let total = this.calculateGrandTotal();
+					if (this.cart.length === 0) return;
+
+					if (this.paymentMethod === 'tunai' && this.paidAmount < total) {
+						alert('Nominal uang bayar kurang dari total tagihan.');
+						return;
+					}
+
+					if (this.paymentMethod === 'kasbon' && !this.selectedCustomerId) {
+						alert('Pelanggan walk-in tidak bisa kasbon! Wajib pilih data pelanggan terdaftar terlebih dahulu.');
+						this.kasbonCustomerDropdownOpen = true;
+						this.$nextTick(() => {
+							this.$refs.kasbonCustomerSearchInput?.focus();
+						});
+						return;
+					}
+
+					this.isSubmitting = true;
+
+					let change = this.paymentMethod === 'tunai' ? Math.max(0, this.paidAmount - total) : 0;
+					let payload = {
+						invoice_no: this.invoiceNo,
+						customer_id: this.selectedCustomerId ? parseInt(this.selectedCustomerId) : null,
+						payment_method: this.paymentMethod,
+						total_amount: total,
+						discount_amount: parseFloat(this.discountAmount) || 0,
+						paid_amount: parseFloat(this.paidAmount) || 0,
+						change_amount: change,
+						due_date: this.paymentMethod === 'kasbon' ? new Date(this.dueDate).toISOString() : null,
+						notes: this.notes,
+						items: this.cart.map(it => ({
+							product_id: it.product_id,
+							is_open_price: !!it.is_open_price,
+							unit_id: it.unit_id,
+							unit_name: it.unit_name,
+							conversion_qty: it.conversion_qty,
+							qty: it.qty,
+							price: it.price,
+							discount: it.discount || 0,
+							subtotal: it.subtotal
+						}))
+					};
+
+					try {
+						let res = await fetch('/pos/checkout', {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify(payload)
+						});
+
+						let result = await res.json();
+						if (result.success) {
+							this.lastCompletedSaleId = result.sale_id;
+							this.lastCompletedInvoice = result.invoice_no;
+							this.lastCompletedPaymentMethod = this.paymentMethod;
+							this.lastCompletedTotal = total;
+							this.lastCompletedPaidAmount = parseFloat(this.paidAmount) || 0;
+							this.waAutoSent = !!result.wa_auto_sent;
+							this.showManualWA = false;
+							let cust = this.selectedCustomer;
+							this.receiptWAPhone = cust ? (this.getCustomerPhone(cust) || '') : '';
+							this.waSendSuccess = '';
+							this.waSendError = '';
+							if (result.wa_auto_sent) {
+								this.startWaCooldown(10);
+							} else {
+								this.waCooldown = 0;
+								if (this.waCooldownTimer) {
+									clearInterval(this.waCooldownTimer);
+									this.waCooldownTimer = null;
+								}
+							}
+							this.showPaymentModal = false;
+							this.showReceiptModal = true;
+
+							this.recentSales.unshift({
+								id: result.sale_id,
+								invoice_no: result.invoice_no,
+								customer_name: this.selectedCustomerId ? (this.customers.find(c => c.id === parseInt(this.selectedCustomerId))?.name || 'Pelanggan') : 'Pelanggan Umum',
+								payment_method: this.paymentMethod,
+								total_amount: total,
+								status: 'sukses'
+							});
+
+							this.cart = [];
+							this.posView = 'catalog';
+							this.discountAmount = 0;
+							this.notes = '';
+							this.selectedCustomerId = '';
+
+							let parts = result.invoice_no.split('-');
+							if (parts.length >= 3) {
+								let nextNum = String(parseInt(parts[2]) + 1).padStart(4, '0');
+								this.invoiceNo = parts[0] + '-' + parts[1] + '-' + nextNum;
+							}
+						} else {
+							alert('Gagal menyelesaikan transaksi: ' + (result.error || 'Terjadi kesalahan'));
+						}
+					} catch (e) {
+						alert('Terjadi kesalahan jaringan: ' + e.message);
+					} finally {
+						this.isSubmitting = false;
+					}
+				},
+
+				startWaCooldown(seconds = 10) {
+					this.waCooldown = seconds;
+					if (this.waCooldownTimer) clearInterval(this.waCooldownTimer);
+					this.waCooldownTimer = setInterval(() => {
+						this.waCooldown--;
+						if (this.waCooldown <= 0) {
+							clearInterval(this.waCooldownTimer);
+							this.waCooldownTimer = null;
+						}
+					}, 1000);
+				},
+
+				async sendReceiptToWhatsApp() {
+					if (this.waCooldown > 0) return;
+					if (!this.receiptWAPhone) {
+						alert('Harap masukkan nomor WhatsApp tujuan!');
+						return;
+					}
+					this.isSendingWA = true;
+					this.waSendSuccess = '';
+					this.waSendError = '';
+					try {
+						let res = await fetch('/sales/' + this.lastCompletedSaleId + '/send-whatsapp', {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ phone: this.receiptWAPhone })
+						});
+						let result = await res.json();
+						if (result.success) {
+							this.waSendSuccess = 'Nota berhasil dikirim ke WhatsApp!';
+							this.waAutoSent = true;
+							this.showManualWA = false;
+							this.startWaCooldown(10);
+						} else {
+							this.waSendError = result.message || 'Gagal mengirim nota via WhatsApp.';
+						}
+					} catch(e) {
+						this.waSendError = 'Kesalahan jaringan: ' + e.message;
+					} finally {
+						this.isSendingWA = false;
+					}
+				}
+			};
+		}
+		</script>
+	}
+}
+
+templ SalesPage(sales []repo.ListSalesRow, filter SalesFilter) {
+	@views.Base("Riwayat Penjualan", "sales") {
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+				<div>
+					<h1 class="text-3xl font-bold text-[#1D1D1F] tracking-tight">Riwayat Penjualan</h1>
+					<p class="text-sm text-[#8E8E93] mt-1">Daftar seluruh transaksi kasir, status pelunasan, dan pembatalan nota.</p>
+				</div>
+				<a
+					href="/pos"
+					class="bg-[#007AFF] hover:bg-[#0066D6] text-white px-5 min-h-[44px] inline-flex items-center gap-2 rounded-xl text-sm font-semibold transition shadow-xs self-start sm:self-auto"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"></path></svg>
+					<span>Layar Kasir</span>
+				</a>
+			</div>
+			<div
+				class="flex flex-col lg:flex-row gap-3 mb-4 items-stretch lg:items-center justify-between"
+				x-data={ fmt.Sprintf("{ period: %q }", filter.Period) }
+			>
+				<div class="relative w-full lg:max-w-md">
+					<input
+						type="text"
+						name="q"
+						value={ filter.Query }
+						placeholder="Cari no nota atau nama pelanggan..."
+						class="w-full pl-10 pr-4 min-h-[44px] bg-white border border-[#E5E5EA] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/sales"
+						hx-target="#sales-table-container"
+						hx-swap="outerHTML"
+						hx-trigger="keyup changed delay:300ms, search"
+						hx-include="[name='status'], [name='method'], [name='period'], [name='from'], [name='to']"
+					/>
+					<svg class="w-5 h-5 text-[#8E8E93] absolute left-3.5 top-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path></svg>
+				</div>
+				<div class="flex flex-wrap items-center gap-2 text-sm text-[#8E8E93]">
+					<select
+						name="period"
+						x-model="period"
+						class="border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] bg-white text-[#1D1D1F] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/sales"
+						hx-target="#sales-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='status'], [name='method'], [name='from'], [name='to']"
+					>
+						<option value="30_days" selected?={ filter.Period == "30_days" || filter.Period == "" }>30 Hari Terakhir</option>
+						<option value="today" selected?={ filter.Period == "today" }>Hari Ini</option>
+						<option value="this_month" selected?={ filter.Period == "this_month" }>Bulan Ini</option>
+						<option value="all" selected?={ filter.Period == "all" }>Semua Waktu</option>
+						<option value="custom" selected?={ filter.Period == "custom" }>Rentang Tanggal</option>
+					</select>
+					<div x-show="period === 'custom'" x-cloak class="flex items-center gap-1.5">
+						<input
+							type="date"
+							name="from"
+							value={ filter.From }
+							class="border border-[#E5E5EA] rounded-xl px-2.5 min-h-[44px] bg-white text-[#1D1D1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							hx-get="/sales"
+							hx-target="#sales-table-container"
+							hx-swap="outerHTML"
+							hx-trigger="change"
+							hx-include="[name='q'], [name='status'], [name='method'], [name='period'], [name='to']"
+						/>
+						<span class="text-xs text-[#8E8E93]">s/d</span>
+						<input
+							type="date"
+							name="to"
+							value={ filter.To }
+							class="border border-[#E5E5EA] rounded-xl px-2.5 min-h-[44px] bg-white text-[#1D1D1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							hx-get="/sales"
+							hx-target="#sales-table-container"
+							hx-swap="outerHTML"
+							hx-trigger="change"
+							hx-include="[name='q'], [name='status'], [name='method'], [name='period'], [name='from']"
+						/>
+					</div>
+					<select
+						name="status"
+						class="border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] bg-white text-[#1D1D1F] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/sales"
+						hx-target="#sales-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='method'], [name='period'], [name='from'], [name='to']"
+					>
+						<option value="" selected?={ filter.Status == "" }>Semua Status</option>
+						<option value="sukses" selected?={ filter.Status == "sukses" }>Sukses</option>
+						<option value="batal" selected?={ filter.Status == "batal" }>Batal (Void)</option>
+					</select>
+					<select
+						name="method"
+						class="border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] bg-white text-[#1D1D1F] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/sales"
+						hx-target="#sales-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='status'], [name='period'], [name='from'], [name='to']"
+					>
+						<option value="" selected?={ filter.Method == "" }>Semua Metode</option>
+						<option value="tunai" selected?={ filter.Method == "tunai" }>Tunai</option>
+						<option value="transfer" selected?={ filter.Method == "transfer" }>Transfer</option>
+						<option value="qris" selected?={ filter.Method == "qris" }>QRIS</option>
+						<option value="kasbon" selected?={ filter.Method == "kasbon" }>Kasbon</option>
+					</select>
+				</div>
+			</div>
+			@SalesTable(sales)
+		</div>
+	}
+}
+
+templ SalesTable(sales []repo.ListSalesRow) {
+	<div id="sales-table-container" class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] overflow-hidden mt-4">
+		<div class="overflow-x-auto">
+			<table class="w-full text-left border-collapse">
+				<thead class="bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]">
+					<tr>
+						<th class="px-6 py-3.5 font-medium">No. Nota</th>
+						<th class="px-6 py-3.5 font-medium">Waktu Transaksi</th>
+						<th class="px-6 py-3.5 font-medium">Pelanggan</th>
+						<th class="px-6 py-3.5 font-medium">Metode</th>
+						<th class="px-6 py-3.5 font-medium text-right">Total Tagihan</th>
+						<th class="px-6 py-3.5 font-medium text-center">Status</th>
+						<th class="px-6 py-3.5 font-medium text-right">Aksi</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+					for _, s := range sales {
+						<tr class="hover:bg-[#F5F5F7]/50 transition">
+							<td class="px-6 py-3.5 font-mono font-bold text-[#007AFF]">
+								<a href={ templ.SafeURL(fmt.Sprintf("/sales/%d", s.ID)) } class="hover:underline">
+									{ s.InvoiceNo }
+								</a>
+							</td>
+							<td class="px-6 py-3.5 text-gray-600 text-sm">
+								{ s.Date.Time.Local().Format("02 Jan 2006, 15:04") }
+							</td>
+							<td class="px-6 py-3.5 font-medium text-[#1D1D1F]">
+								{ s.CustomerName }
+							</td>
+							<td class="px-6 py-3.5">
+								<span class="capitalize text-xs font-semibold px-2.5 py-1 rounded-md bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5EA]">
+									{ s.PaymentMethod }
+								</span>
+							</td>
+							<td class="px-6 py-3.5 text-right font-bold text-[#1D1D1F] tabular-nums">
+								{ "Rp " + utils.FormatRupiah(s.TotalAmount) }
+							</td>
+							<td class="px-6 py-3.5 text-center">
+								if s.Status == "sukses" {
+									if s.PaymentStatus == "kasbon" {
+										<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-[#FF9500] border border-amber-200">
+											Kasbon
+										</span>
+									} else {
+										<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-[#34C759] border border-green-200">
+											Lunas
+										</span>
+									}
+								} else {
+									<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-[#FF3B30] border border-red-200">
+										Batal
+									</span>
+								}
+							</td>
+							<td class="px-6 py-3.5 text-right">
+								<div class="flex items-center justify-end gap-2">
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/sales/%d", s.ID)) }
+										class="inline-flex items-center justify-center min-w-[36px] min-h-[36px] bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 rounded-xl transition text-xs font-semibold px-3"
+									>
+										Detail
+									</a>
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/sales/%d/receipt", s.ID)) }
+										target="_blank"
+										class="inline-flex items-center justify-center min-w-[36px] min-h-[36px] bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA] rounded-xl transition text-xs font-medium px-2.5"
+										title="Cetak Struk"
+									>
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+									</a>
+								</div>
+							</td>
+						</tr>
+					}
+					if len(sales) == 0 {
+						<tr>
+							<td colspan="7" class="px-6 py-8 text-center text-[#8E8E93]">
+								Belum ada riwayat penjualan.
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+}
+
+templ SaleDetailPage(sale repo.GetSaleByIDRow, details []repo.GetSaleDetailsRow, customers []repo.Customer) {
+	@views.Base("Detail Transaksi - "+sale.InvoiceNo, "sales") {
+		<div
+			x-data={ fmt.Sprintf(`{
+				showWAModal: false,
+				phone: %q,
+				searchCustomer: '',
+				dropdownOpen: false,
+				sending: false,
+				cooldown: 0,
+				timer: null,
+				statusMsg: '',
+				isError: false,
+				customers: %s,
+				get filteredCustomers() {
+					let q = this.searchCustomer.toLowerCase().trim();
+					if (!q) return this.customers;
+					return this.customers.filter(c => 
+						(c.name && c.name.toLowerCase().includes(q)) || 
+						(c.phone && c.phone.toLowerCase().includes(q))
+					);
+				},
+				selectCustomer(c) {
+					if (c && c.phone) {
+						this.phone = c.phone;
+					}
+					this.dropdownOpen = false;
+					this.searchCustomer = '';
+				},
+				async sendWA() {
+					if (this.cooldown > 0) return;
+					if (!this.phone.trim()) {
+						this.statusMsg = 'Nomor WhatsApp tidak boleh kosong!';
+						this.isError = true;
+						return;
+					}
+					this.sending = true;
+					this.statusMsg = '';
+					try {
+						let res = await fetch('/sales/%d/send-whatsapp', {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ phone: this.phone.trim() })
+						});
+						let data = await res.json();
+						if (data.success) {
+							this.statusMsg = 'Nota berhasil dikirim ke WhatsApp!';
+							this.isError = false;
+							this.cooldown = 10;
+							if (this.timer) clearInterval(this.timer);
+							this.timer = setInterval(() => {
+								this.cooldown--;
+								if (this.cooldown <= 0) {
+									clearInterval(this.timer);
+									this.timer = null;
+								}
+							}, 1000);
+						} else {
+							this.statusMsg = 'Gagal: ' + (data.message || 'Terjadi kesalahan');
+							this.isError = true;
+						}
+					} catch(e) {
+						this.statusMsg = 'Kesalahan jaringan: ' + e.message;
+						this.isError = true;
+					} finally {
+						this.sending = false;
+					}
+				}
+			}`, sale.CustomerPhone, serializeCustomerContacts(customers), sale.ID) }
+			class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6"
+		>
+			<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+				<div class="flex items-center gap-3">
+					<a href="/sales" class="min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition">
+						<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"></path></svg>
+					</a>
+					<div>
+						<div class="flex items-center gap-2">
+							<h1 class="text-2xl font-bold text-[#1D1D1F] font-mono">{ sale.InvoiceNo }</h1>
+							if sale.Status == "sukses" {
+								<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-[#34C759] border border-green-200">Sukses</span>
+							} else {
+								<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-[#FF3B30] border border-red-200">Batal (Void)</span>
+							}
+						</div>
+						<p class="text-sm text-[#8E8E93] mt-1">{ sale.Date.Time.Local().Format("02 January 2006, 15:04 WIB") }</p>
+					</div>
+				</div>
+				<div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto justify-start sm:justify-end">
+					<a
+						href={ templ.SafeURL(fmt.Sprintf("/sales/%d/receipt", sale.ID)) }
+						target="_blank"
+						class="min-h-[44px] px-4 rounded-xl bg-[#007AFF] text-white font-medium text-sm inline-flex items-center gap-2 hover:bg-[#0066D6] transition shadow-xs"
+					>
+						<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.079.766-2.013 1.833-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z"></path></svg>
+						<span>Cetak Struk</span>
+					</a>
+					<button
+						type="button"
+						@click="showWAModal = true; statusMsg = ''"
+						:disabled="cooldown > 0"
+						class="min-h-[44px] px-4 rounded-xl bg-[#25D366] text-white font-medium text-sm inline-flex items-center gap-2 hover:bg-[#1EBE5D] transition shadow-xs disabled:opacity-50"
+						title="Kirim Nota via WhatsApp"
+					>
+						<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.173.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.176.582 4.217 1.597 5.975l-1.605 5.869 6.046-1.587c1.705.938 3.665 1.473 5.751 1.473 6.627 0 12-5.373 12-12 0-6.628-5.373-12-11.789-12z"></path></svg>
+						<span x-text="cooldown > 0 ? 'Tunggu (' + cooldown + 's)' : 'Kirim WA'"></span>
+					</button>
+					if sale.Status == "sukses" {
+						<button
+							type="button"
+							hx-post={ fmt.Sprintf("/sales/%d/void", sale.ID) }
+							hx-confirm="PERINGATAN: Apakah Anda yakin ingin membatalkan transaksi ini? Stok fisik produk akan otomatis dikembalikan ke inventori!"
+							class="min-h-[44px] px-4 rounded-xl bg-[#FF3B30]/10 text-[#FF3B30] hover:bg-[#FF3B30]/20 font-semibold text-sm inline-flex items-center gap-2 transition"
+						>
+							Batal Transaksi (Void)
+						</button>
+					}
+				</div>
+			</div>
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-5 space-y-2">
+					<span class="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider">Informasi Pelanggan</span>
+					<div class="pt-1">
+						<p class="text-base font-bold text-[#1D1D1F]">{ sale.CustomerName }</p>
+						if sale.CustomerPhone != "" {
+							<p class="text-sm text-gray-600 mt-0.5">Telp: { sale.CustomerPhone }</p>
+						}
+						if sale.CustomerAddress != "" {
+							<p class="text-sm text-[#8E8E93] mt-0.5">{ sale.CustomerAddress }</p>
+						}
+					</div>
+				</div>
+				<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-5 space-y-2">
+					<span class="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider">Metode & Status Pembayaran</span>
+					<div class="pt-1 flex items-center justify-between">
+						<div>
+							<p class="text-base font-bold text-[#1D1D1F] capitalize">{ sale.PaymentMethod }</p>
+							<p class="text-xs text-[#8E8E93] mt-0.5">Status: <span class="font-semibold text-[#1D1D1F] uppercase">{ sale.PaymentStatus }</span></p>
+						</div>
+						if sale.PaymentStatus == "kasbon" && sale.DueDate.Valid {
+							<div class="text-right">
+								<span class="text-xs text-[#8E8E93]">Jatuh Tempo:</span>
+								<p class="text-sm font-bold text-[#FF9500]">{ sale.DueDate.Time.Format("02 Jan 2006") }</p>
+							</div>
+						}
+					</div>
+				</div>
+			</div>
+			<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] overflow-hidden">
+				<div class="p-4 border-b border-[#E5E5EA]">
+					<h3 class="font-bold text-[#1D1D1F]">Rincian Barang / Jasa</h3>
+				</div>
+				<div class="overflow-x-auto">
+					<table class="w-full text-left border-collapse">
+						<thead class="bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]">
+							<tr>
+								<th class="px-6 py-3 font-medium">Item</th>
+								<th class="px-6 py-3 font-medium text-center">Satuan</th>
+								<th class="px-6 py-3 font-medium text-right">Qty</th>
+								<th class="px-6 py-3 font-medium text-right">Harga Satuan</th>
+								<th class="px-6 py-3 font-medium text-right">Diskon Item</th>
+								<th class="px-6 py-3 font-medium text-right">Subtotal</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+							for _, d := range details {
+								<tr class="hover:bg-[#F5F5F7]/40 transition">
+									<td class="px-6 py-3.5">
+										<div class="font-semibold text-[#1D1D1F]">{ d.ProductName }</div>
+										<div class="text-xs text-[#8E8E93] font-mono">{ d.Sku }</div>
+									</td>
+									<td class="px-6 py-3.5 text-center text-sm text-[#1D1D1F]">
+										{ d.UnitName }
+									</td>
+									<td class="px-6 py-3.5 text-right font-medium tabular-nums">
+										{ fmt.Sprint(d.Qty) }
+									</td>
+									<td class="px-6 py-3.5 text-right tabular-nums text-gray-600">
+										if d.IsOpenPrice.Bool {
+											<span class="text-gray-400 font-medium">-</span>
+										} else {
+											{ "Rp " + utils.FormatRupiah(d.Price) }
+										}
+									</td>
+									<td class="px-6 py-3.5 text-right tabular-nums">
+										if utils.NumericToFloat(d.Discount) > 0 {
+											<span class="text-[#FF3B30] font-medium">{ "- Rp " + utils.FormatRupiah(d.Discount) }</span>
+										} else {
+											<span class="text-gray-400">-</span>
+										}
+									</td>
+									<td class="px-6 py-3.5 text-right font-bold text-[#1D1D1F] tabular-nums">
+										{ "Rp " + utils.FormatRupiah(d.Subtotal) }
+									</td>
+								</tr>
+							}
+						</tbody>
+						<tfoot class="bg-[#F5F5F7]/60 border-t border-[#E5E5EA] text-sm">
+							if calcTotalDiscounts(details, sale.DiscountAmount) > 0 {
+								<tr>
+									<td colspan="5" class="px-6 py-2.5 text-right font-medium text-[#8E8E93]">Subtotal:</td>
+									<td class="px-6 py-2.5 text-right font-semibold text-[#1D1D1F] tabular-nums">
+										{ "Rp " + utils.FormatFloatRupiah(calcGrossSubtotal(details)) }
+									</td>
+								</tr>
+								if calcTotalItemDiscounts(details) > 0 && utils.NumericToFloat(sale.DiscountAmount) > 0 {
+									<tr>
+										<td colspan="5" class="px-6 py-1.5 text-right font-medium text-[#8E8E93] text-xs">Diskon Item:</td>
+										<td class="px-6 py-1.5 text-right font-semibold text-[#FF3B30] text-xs tabular-nums">
+											{ "- Rp " + utils.FormatFloatRupiah(calcTotalItemDiscounts(details)) }
+										</td>
+									</tr>
+									<tr>
+										<td colspan="5" class="px-6 py-1.5 text-right font-medium text-[#8E8E93] text-xs">Diskon Nota:</td>
+										<td class="px-6 py-1.5 text-right font-semibold text-[#FF3B30] text-xs tabular-nums">
+											{ "- Rp " + utils.FormatRupiah(sale.DiscountAmount) }
+										</td>
+									</tr>
+									<tr>
+										<td colspan="5" class="px-6 py-2 text-right font-bold text-[#8E8E93]">Total Diskon:</td>
+										<td class="px-6 py-2 text-right font-bold text-[#FF3B30] tabular-nums">
+											{ "- Rp " + utils.FormatFloatRupiah(calcTotalDiscounts(details, sale.DiscountAmount)) }
+										</td>
+									</tr>
+								} else {
+									<tr>
+										<td colspan="5" class="px-6 py-2 text-right font-bold text-[#8E8E93]">Total Diskon:</td>
+										<td class="px-6 py-2 text-right font-bold text-[#FF3B30] tabular-nums">
+											{ "- Rp " + utils.FormatFloatRupiah(calcTotalDiscounts(details, sale.DiscountAmount)) }
+										</td>
+									</tr>
+								}
+							}
+							<tr>
+								<td colspan="5" class="px-6 py-3 text-right font-bold text-[#1D1D1F] text-base">Total Tagihan:</td>
+								<td class="px-6 py-3 text-right font-black text-[#007AFF] text-lg tabular-nums">
+									{ "Rp " + utils.FormatRupiah(sale.TotalAmount) }
+								</td>
+							</tr>
+							if sale.PaymentStatus == "kasbon" {
+								<tr>
+									<td colspan="5" class="px-6 py-2 text-right text-xs text-[#8E8E93]">Uang Muka (DP):</td>
+									<td class="px-6 py-2 text-right font-semibold text-[#1D1D1F] tabular-nums">
+										{ "Rp " + utils.FormatRupiah(sale.PaidAmount) }
+									</td>
+								</tr>
+								<tr>
+									<td colspan="5" class="px-6 py-2.5 text-right font-bold text-red-600">Sisa Tagihan Kasbon:</td>
+									<td class="px-6 py-2.5 text-right font-black text-[#FF3B30] text-base tabular-nums">
+										{ "Rp " + utils.FormatFloatRupiah(utils.NumericToFloat(sale.TotalAmount) - utils.NumericToFloat(sale.PaidAmount)) }
+									</td>
+								</tr>
+							} else {
+								<tr>
+									<td colspan="5" class="px-6 py-2 text-right text-xs text-[#8E8E93]">Uang Diterima:</td>
+									<td class="px-6 py-2 text-right font-semibold text-[#1D1D1F] tabular-nums">
+										{ "Rp " + utils.FormatRupiah(sale.PaidAmount) }
+									</td>
+								</tr>
+								if sale.PaymentMethod == "tunai" {
+									<tr>
+										<td colspan="5" class="px-6 py-2 text-right text-xs text-[#8E8E93]">Kembalian:</td>
+										<td class="px-6 py-2 text-right font-semibold text-[#34C759] tabular-nums">
+											{ "Rp " + utils.FormatRupiah(sale.ChangeAmount) }
+										</td>
+									</tr>
+								}
+							}
+						</tfoot>
+					</table>
+				</div>
+			</div>
+			<div
+				x-show="showWAModal"
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/50 backdrop-blur-xs"
+				@click.self="showWAModal = false"
+			>
+				<div class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-md overflow-hidden flex flex-col p-6 space-y-4">
+					<div class="flex items-center justify-between pb-3 border-b border-[#E5E5EA]">
+						<div class="flex items-center gap-2">
+							<div class="w-8 h-8 rounded-full bg-[#25D366]/15 flex items-center justify-center text-[#25D366]">
+								<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.173.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.176.582 4.217 1.597 5.975l-1.605 5.869 6.046-1.587c1.705.938 3.665 1.473 5.751 1.473 6.627 0 12-5.373 12-12 0-6.628-5.373-12-11.789-12z"></path></svg>
+							</div>
+							<h3 class="font-bold text-[#1D1D1F]">Kirim Nota via WhatsApp</h3>
+						</div>
+						<button type="button" @click="showWAModal = false" class="text-[#8E8E93] hover:text-[#1D1D1F] p-1 rounded-lg">
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<div class="space-y-3">
+						<div>
+							<label class="block text-xs font-semibold text-[#8E8E93] mb-1">Nomor WhatsApp Tujuan</label>
+							<input
+								type="text"
+								x-model="phone"
+								placeholder="Contoh: 08123456789"
+								class="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-transparent rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-[#25D366] tabular-nums"
+							/>
+						</div>
+						<div class="relative" @click.outside="dropdownOpen = false">
+							<div class="flex items-center justify-between text-xs text-[#8E8E93] mb-1">
+								<span class="font-semibold">Tarik Nomor dari Daftar Customer:</span>
+							</div>
+							<button
+								type="button"
+								@click="dropdownOpen = !dropdownOpen"
+								class="w-full px-3 py-2 bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl text-xs flex items-center justify-between hover:bg-[#E5E5EA]/60 transition"
+							>
+								<span class="text-[#8E8E93]">Pilih atau cari dari daftar customer...</span>
+								<svg class="w-4 h-4 text-[#8E8E93] transition-transform" :class="dropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+							</button>
+							<div
+								x-show="dropdownOpen"
+								x-cloak
+								class="absolute left-0 right-0 z-30 mt-1 bg-white border border-[#E5E5EA] rounded-2xl shadow-xl p-2 space-y-1.5"
+							>
+								<div class="relative">
+									<input
+										type="text"
+										x-model="searchCustomer"
+										placeholder="Ketik nama atau nomor customer..."
+										class="w-full pl-8 pr-3 py-1.5 bg-[#F5F5F7] rounded-xl text-xs outline-none focus:bg-white focus:ring-1 focus:ring-[#007AFF]"
+									/>
+									<svg class="w-3.5 h-3.5 text-[#8E8E93] absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+								</div>
+								<div class="max-h-48 overflow-y-auto divide-y divide-[#E5E5EA]/60">
+									<template x-for="c in filteredCustomers" :key="c.id">
+										<button
+											type="button"
+											@click="selectCustomer(c)"
+											class="w-full text-left px-2.5 py-2 rounded-xl text-xs hover:bg-[#007AFF]/10 flex items-center justify-between transition"
+										>
+											<div class="min-w-0 pr-2">
+												<p class="font-semibold text-[#1D1D1F]" x-text="c.name"></p>
+												<p class="text-[11px] text-[#8E8E93] tabular-nums" x-text="c.phone"></p>
+											</div>
+											<svg class="w-3.5 h-3.5 text-[#007AFF] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+										</button>
+									</template>
+									<div x-show="filteredCustomers.length === 0" class="p-3 text-center text-xs text-[#8E8E93]">
+										Customer tidak ditemukan
+									</div>
+								</div>
+							</div>
+						</div>
+						<template x-if="statusMsg">
+							<div :class="isError ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'" class="p-2.5 rounded-xl border text-xs">
+								<p x-text="statusMsg"></p>
+							</div>
+						</template>
+					</div>
+					<div class="flex gap-2 pt-2">
+						<button
+							type="button"
+							@click="showWAModal = false"
+							class="flex-1 py-2.5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] text-xs font-semibold hover:bg-black/5 transition"
+						>
+							Batal
+						</button>
+						<button
+							type="button"
+							@click="sendWA()"
+							:disabled="sending || cooldown > 0 || !phone.trim()"
+							class="flex-1 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs disabled:opacity-50"
+						>
+							<svg x-show="!sending && cooldown === 0" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.173.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.176.582 4.217 1.597 5.975l-1.605 5.869 6.046-1.587c1.705.938 3.665 1.473 5.751 1.473 6.627 0 12-5.373 12-12 0-6.628-5.373-12-11.789-12z"></path></svg>
+							<span x-text="sending ? 'Mengirim...' : (cooldown > 0 ? 'Tunggu (' + cooldown + 's)' : 'Kirim Nota')"></span>
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ ReceiptView(sale repo.GetSaleByIDRow, details []repo.GetSaleDetailsRow, company repo.GetCompanyConfigRow) {
+	<!DOCTYPE html>
+	<html lang="id">
+		<head>
+			<meta charset="UTF-8"/>
+			<title>{ "Struk " + sale.InvoiceNo }</title>
+			<style>
+				@page {
+					size: 80mm auto;
+					margin: 0;
+				}
+				body {
+					font-family: 'Courier New', Courier, monospace;
+					font-size: 12px;
+					line-height: 1.3;
+					color: #000;
+					margin: 0;
+					padding: 10px;
+					max-width: 80mm;
+					background: #fff;
+				}
+				.text-center { text-align: center; }
+				.text-right { text-align: right; }
+				.bold { font-weight: bold; }
+				.divider { border-top: 1px dashed #000; margin: 6px 0; }
+				.double-divider { border-top: 2px dashed #000; margin: 6px 0; }
+				.row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+				@media print {
+					.no-print { display: none !important; }
+				}
+			</style>
+		</head>
+		<body>
+			<div class="no-print" style="margin-bottom: 15px; text-align: center;">
+				<button onclick="window.print()" style="padding: 8px 16px; background: #007AFF; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+					Cetak Struk Sekarang
+				</button>
+			</div>
+			<div class="text-center">
+				<div class="bold" style="font-size: 15px; text-transform: uppercase;">{ company.Name }</div>
+				if company.Tagline != "" {
+					<div>{ company.Tagline }</div>
+				}
+				if company.Address != "" {
+					<div style="font-size: 10px;">{ company.Address }</div>
+				}
+				if company.Phone != "" {
+					<div style="font-size: 10px;">Telp: { company.Phone }</div>
+				}
+			</div>
+			<div class="divider"></div>
+			<div class="row">
+				<span>Nota:</span>
+				<span class="bold">{ sale.InvoiceNo }</span>
+			</div>
+			<div class="row">
+				<span>Tgl:</span>
+				<span>{ sale.Date.Time.Local().Format("02/01/2006 15:04") }</span>
+			</div>
+			<div class="row">
+				<span>Pelanggan:</span>
+				<span>{ sale.CustomerName }</span>
+			</div>
+			<div class="divider"></div>
+			for _, d := range details {
+				<div>
+					<div class="bold">{ d.ProductName }</div>
+					<div class="row" style="padding-left: 5px;">
+						if d.IsOpenPrice.Bool {
+							<span>{ fmt.Sprintf("%d %s", d.Qty, d.UnitName) }</span>
+						} else {
+							<span>{ fmt.Sprintf("%d %s x %s", d.Qty, d.UnitName, utils.FormatRupiah(d.Price)) }</span>
+						}
+						<span>{ utils.FormatFloatRupiah(utils.NumericToFloat(d.Subtotal) + utils.NumericToFloat(d.Discount)) }</span>
+					</div>
+					if utils.NumericToFloat(d.Discount) > 0 {
+						<div class="row" style="padding-left: 10px; font-size: 11px; color: #555;">
+							<span>(Diskon item)</span>
+							<span>{ "- " + utils.FormatRupiah(d.Discount) }</span>
+						</div>
+					}
+				</div>
+			}
+			<div class="divider"></div>
+			if calcTotalDiscounts(details, sale.DiscountAmount) > 0 {
+				<div class="row">
+					<span>Subtotal:</span>
+					<span>{ utils.FormatFloatRupiah(calcGrossSubtotal(details)) }</span>
+				</div>
+				if calcTotalItemDiscounts(details) > 0 && utils.NumericToFloat(sale.DiscountAmount) > 0 {
+					<div class="row" style="font-size: 11px; color: #555;">
+						<span>Diskon Item:</span>
+						<span>{ "- " + utils.FormatFloatRupiah(calcTotalItemDiscounts(details)) }</span>
+					</div>
+					<div class="row" style="font-size: 11px; color: #555;">
+						<span>Diskon Nota:</span>
+						<span>{ "- " + utils.FormatRupiah(sale.DiscountAmount) }</span>
+					</div>
+					<div class="row font-semibold">
+						<span>Total Diskon:</span>
+						<span>{ "- " + utils.FormatFloatRupiah(calcTotalDiscounts(details, sale.DiscountAmount)) }</span>
+					</div>
+				} else {
+					<div class="row font-semibold">
+						<span>Total Diskon:</span>
+						<span>{ "- " + utils.FormatFloatRupiah(calcTotalDiscounts(details, sale.DiscountAmount)) }</span>
+					</div>
+				}
+			}
+			<div class="row bold" style="font-size: 13px;">
+				<span>TOTAL:</span>
+				<span>{ "Rp " + utils.FormatRupiah(sale.TotalAmount) }</span>
+			</div>
+			if sale.PaymentStatus == "kasbon" {
+				if utils.NumericToFloat(sale.PaidAmount) > 0 {
+					<div class="row">
+						<span>DP / Uang Muka:</span>
+						<span>{ utils.FormatRupiah(sale.PaidAmount) }</span>
+					</div>
+				}
+				<div class="row bold" style="font-size: 12px; margin-top: 2px;">
+					<span>SISA KASBON:</span>
+					<span>{ "Rp " + utils.FormatFloatRupiah(utils.NumericToFloat(sale.TotalAmount) - utils.NumericToFloat(sale.PaidAmount)) }</span>
+				</div>
+				if sale.DueDate.Valid {
+					<div class="row" style="margin-top: 2px; font-size: 11px;">
+						<span>Jatuh Tempo:</span>
+						<span>{ sale.DueDate.Time.Format("02/01/2006") }</span>
+					</div>
+				}
+			} else {
+				<div class="row">
+					<span>Bayar ({ sale.PaymentMethod }):</span>
+					<span>{ utils.FormatRupiah(sale.PaidAmount) }</span>
+				</div>
+				if sale.PaymentMethod == "tunai" {
+					<div class="row">
+						<span>Kembali:</span>
+						<span>{ utils.FormatRupiah(sale.ChangeAmount) }</span>
+					</div>
+				}
+			}
+			<div class="double-divider"></div>
+			<div class="text-center" style="font-size: 10px; margin-top: 8px; white-space: pre-line;">
+				{ company.ReceiptFooter }
+			</div>
+			<script>
+				window.addEventListener('load', () => {
+					if (window.opener) {
+						window.print();
+					}
+				});
+			</script>
+		</body>
+	</html>
+}

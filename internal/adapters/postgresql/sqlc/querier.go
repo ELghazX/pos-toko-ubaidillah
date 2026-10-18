@@ -6,14 +6,105 @@ package repo
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
+	BackfillZeroCogsByProductID(ctx context.Context, arg BackfillZeroCogsByProductIDParams) error
+	CancelPendingBackordersByPrefix(ctx context.Context, invoiceNumber string) error
+	CancelPurchaseOrder(ctx context.Context, id int32) error
+	CountDebtInvoices(ctx context.Context, arg CountDebtInvoicesParams) (int64, error)
+	CountLowStockProducts(ctx context.Context) (int64, error)
+	CountProducts(ctx context.Context, arg CountProductsParams) (int64, error)
+	CountSalesDetailReport(ctx context.Context, arg CountSalesDetailReportParams) (int64, error)
+	CountStockAdjustments(ctx context.Context, arg CountStockAdjustmentsParams) (int64, error)
+	CountUsers(ctx context.Context) (int64, error)
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
+	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
+	CreateInventoryLedger(ctx context.Context, arg CreateInventoryLedgerParams) error
+	CreateProduct(ctx context.Context, arg CreateProductParams) (int32, error)
+	CreateProductUnit(ctx context.Context, arg CreateProductUnitParams) error
+	CreatePurchase(ctx context.Context, arg CreatePurchaseParams) (int32, error)
+	CreatePurchaseDetail(ctx context.Context, arg CreatePurchaseDetailParams) error
+	CreateSale(ctx context.Context, arg CreateSaleParams) (int32, error)
+	CreateSaleDetail(ctx context.Context, arg CreateSaleDetailParams) error
+	CreateStockAdjustment(ctx context.Context, arg CreateStockAdjustmentParams) (StockAdjustment, error)
+	CreateSupplier(ctx context.Context, arg CreateSupplierParams) (Supplier, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeactivateProductUnitsByProductID(ctx context.Context, productID int32) error
 	DeleteCategory(ctx context.Context, id int32) error
+	DeleteCustomer(ctx context.Context, id int32) error
+	DeleteProduct(ctx context.Context, id int32) error
+	DeletePurchaseDetailByID(ctx context.Context, id int32) error
+	DeleteSupplier(ctx context.Context, id int32) error
 	GetCategoryByID(ctx context.Context, id int32) (Category, error)
+	GetCompanyConfig(ctx context.Context) (GetCompanyConfigRow, error)
+	GetCustomerByID(ctx context.Context, id int32) (Customer, error)
+	GetCustomerByIDAnyStatus(ctx context.Context, id int32) (Customer, error)
+	GetCustomerUnpaidDebtTotal(ctx context.Context, customerID pgtype.Int4) (pgtype.Numeric, error)
+	GetDashboardLowStockProducts(ctx context.Context) ([]GetDashboardLowStockProductsRow, error)
+	GetDebtsSummaryMetrics(ctx context.Context) (GetDebtsSummaryMetricsRow, error)
+	GetLastProductByCategory(ctx context.Context, arg GetLastProductByCategoryParams) (string, error)
+	GetLastStockAdjustmentNo(ctx context.Context, adjustmentNo string) (string, error)
+	GetNonMovingStockReport(ctx context.Context, dollar_1 pgtype.Timestamptz) ([]GetNonMovingStockReportRow, error)
+	GetProductByID(ctx context.Context, id int32) (Product, error)
+	GetProductBySKU(ctx context.Context, sku string) (Product, error)
+	GetProductOpeningStock(ctx context.Context, arg GetProductOpeningStockParams) (int32, error)
+	GetProductStockLedger(ctx context.Context, arg GetProductStockLedgerParams) ([]GetProductStockLedgerRow, error)
+	GetProductUnits(ctx context.Context, productID int32) ([]ProductUnit, error)
+	GetProfitLossReport(ctx context.Context, arg GetProfitLossReportParams) (GetProfitLossReportRow, error)
+	GetPurchaseByID(ctx context.Context, id int32) (GetPurchaseByIDRow, error)
+	GetPurchaseDetails(ctx context.Context, purchaseID int32) ([]GetPurchaseDetailsRow, error)
+	GetPurchasesReport(ctx context.Context, arg GetPurchasesReportParams) ([]GetPurchasesReportRow, error)
+	GetRecentDashboardSales(ctx context.Context) ([]GetRecentDashboardSalesRow, error)
+	GetSaleByID(ctx context.Context, id int32) (GetSaleByIDRow, error)
+	GetSaleDetails(ctx context.Context, saleID int32) ([]GetSaleDetailsRow, error)
+	GetSalesDetailReport(ctx context.Context, arg GetSalesDetailReportParams) ([]GetSalesDetailReportRow, error)
+	GetSalesReportDaily(ctx context.Context, arg GetSalesReportDailyParams) ([]GetSalesReportDailyRow, error)
+	GetSalesReportPaymentMethods(ctx context.Context, arg GetSalesReportPaymentMethodsParams) ([]GetSalesReportPaymentMethodsRow, error)
+	GetStockAdjustmentByID(ctx context.Context, id int32) (GetStockAdjustmentByIDRow, error)
+	GetStockValuationReport(ctx context.Context) ([]GetStockValuationReportRow, error)
+	GetSupplierByID(ctx context.Context, id int32) (Supplier, error)
+	GetTodayReceivablesMetrics(ctx context.Context) (GetTodayReceivablesMetricsRow, error)
+	GetTodaySalesMetrics(ctx context.Context) (GetTodaySalesMetricsRow, error)
+	GetTopProductsTodayOrWeek(ctx context.Context) ([]GetTopProductsTodayOrWeekRow, error)
+	GetUserByID(ctx context.Context, id int32) (User, error)
+	GetUserByUsername(ctx context.Context, lower string) (User, error)
+	GetWeeklySalesTrend(ctx context.Context) ([]GetWeeklySalesTrendRow, error)
+	ListActiveGoodsProducts(ctx context.Context) ([]Product, error)
+	ListAllActiveProductUnitsWithLastCost(ctx context.Context) ([]ListAllActiveProductUnitsWithLastCostRow, error)
 	ListCategories(ctx context.Context) ([]Category, error)
+	ListCustomerDebtRecap(ctx context.Context, arg ListCustomerDebtRecapParams) ([]ListCustomerDebtRecapRow, error)
+	ListCustomerUnpaidInvoices(ctx context.Context, customerID pgtype.Int4) ([]ListCustomerUnpaidInvoicesRow, error)
+	ListCustomers(ctx context.Context) ([]Customer, error)
+	ListCustomersWithFilter(ctx context.Context, dollar_1 string) ([]Customer, error)
+	ListDebtInvoices(ctx context.Context, arg ListDebtInvoicesParams) ([]ListDebtInvoicesRow, error)
+	ListDebtPaymentsByCustomerID(ctx context.Context, customerID pgtype.Int4) ([]ListDebtPaymentsByCustomerIDRow, error)
+	ListPOSProductUnits(ctx context.Context) ([]ListPOSProductUnitsRow, error)
+	ListPOSProducts(ctx context.Context) ([]ListPOSProductsRow, error)
+	ListProductStockLedger(ctx context.Context, productID int32) ([]ListProductStockLedgerRow, error)
+	ListPurchases(ctx context.Context) ([]ListPurchasesRow, error)
+	ListSales(ctx context.Context) ([]ListSalesRow, error)
+	ListStockAdjustments(ctx context.Context, arg ListStockAdjustmentsParams) ([]ListStockAdjustmentsRow, error)
+	ListSuppliers(ctx context.Context) ([]Supplier, error)
+	ListUsers(ctx context.Context) ([]User, error)
+	ReopenPurchaseOrder(ctx context.Context, id int32) error
+	RestoreCustomer(ctx context.Context, id int32) error
+	SearchProducts(ctx context.Context, arg SearchProductsParams) ([]SearchProductsRow, error)
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) error
+	UpdateCompanyConfig(ctx context.Context, arg UpdateCompanyConfigParams) error
+	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error
+	UpdateExistingProductUnit(ctx context.Context, arg UpdateExistingProductUnitParams) (int32, error)
+	UpdateProduct(ctx context.Context, arg UpdateProductParams) error
+	UpdateProductStockAndCost(ctx context.Context, arg UpdateProductStockAndCostParams) error
+	UpdatePurchaseDetailOnReceive(ctx context.Context, arg UpdatePurchaseDetailOnReceiveParams) error
+	UpdatePurchaseOnReceive(ctx context.Context, arg UpdatePurchaseOnReceiveParams) error
+	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) error
+	UpdateUser(ctx context.Context, arg UpdateUserParams) error
+	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	VoidGoodsReceipt(ctx context.Context, id int32) error
+	VoidSale(ctx context.Context, id int32) error
 }
 
 var _ Querier = (*Queries)(nil)

@@ -1,0 +1,1581 @@
+package purchases
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+	repo "github.com/ELghazX/pos-toko-ubaidillah/internal/adapters/postgresql/sqlc"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/utils"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/views"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+func formatDate(ts pgtype.Timestamptz) string {
+	if !ts.Valid {
+		return "-"
+	}
+	return ts.Time.Local().Format("02 Jan 2006 15:04")
+}
+
+func buildCatalogJSON(products []repo.Product, units []repo.ListAllActiveProductUnitsWithLastCostRow) string {
+	type unitDTO struct {
+		ID            int32   `json:"id"`
+		UnitName      string  `json:"unit_name"`
+		ConversionQty int32   `json:"conversion_qty"`
+		LastCost      float64 `json:"last_cost"`
+	}
+	type prodDTO struct {
+		ID           int32     `json:"id"`
+		SKU          string    `json:"sku"`
+		Name         string    `json:"name"`
+		CurrentStock int32     `json:"current_stock"`
+		Units        []unitDTO `json:"units"`
+	}
+
+	unitMap := make(map[int32][]unitDTO)
+	for _, u := range units {
+		unitMap[u.ProductID] = append(unitMap[u.ProductID], unitDTO{
+			ID:            u.ID,
+			UnitName:      u.UnitName,
+			ConversionQty: u.ConversionQty,
+			LastCost:      utils.NumericToFloat(u.LastCost),
+		})
+	}
+
+	var list []prodDTO
+	for _, p := range products {
+		pu := unitMap[p.ID]
+		if len(pu) == 0 {
+			pu = []unitDTO{{ID: 0, UnitName: "Pcs", ConversionQty: 1, LastCost: utils.NumericToFloat(p.AverageCost)}}
+		}
+		list = append(list, prodDTO{
+			ID:           p.ID,
+			SKU:          p.Sku,
+			Name:         p.Name,
+			CurrentStock: p.CurrentStock,
+			Units:        pu,
+		})
+	}
+	b, _ := json.Marshal(list)
+	return string(b)
+}
+
+func buildSuppliersJSON(suppliers []repo.Supplier, allowGeneral bool) string {
+	type sDTO struct {
+		ID   int32  `json:"id"`
+		Name string `json:"name"`
+	}
+	var list []sDTO
+	if allowGeneral {
+		list = append(list, sDTO{ID: 0, Name: "-- Supplier Umum --"})
+	}
+	for _, s := range suppliers {
+		list = append(list, sDTO{ID: s.ID, Name: s.Name})
+	}
+	b, _ := json.Marshal(list)
+	return string(b)
+}
+
+templ SupplierCombobox(suppliers []repo.Supplier, selectedID int32, allowGeneral bool) {
+	<div
+		class="relative"
+		x-data={ fmt.Sprintf(`{
+			open: false,
+			search: '',
+			selectedId: %d,
+			allowGeneral: %t,
+			suppliers: %s,
+			get selectedName() {
+				const found = this.suppliers.find(s => s.id === this.selectedId);
+				if (found) return found.name;
+				return this.allowGeneral ? '-- Supplier Umum --' : '-- Pilih Supplier Vendor --';
+			},
+			filtered() {
+				const q = this.search.toLowerCase().trim();
+				if (!q) return this.suppliers;
+				return this.suppliers.filter(s => s.name.toLowerCase().includes(q));
+			},
+			select(s) {
+				this.selectedId = s.id;
+				this.open = false;
+				this.search = '';
+			}
+		}`, selectedID, allowGeneral, buildSuppliersJSON(suppliers, allowGeneral)) }
+		@click.outside="open = false"
+	>
+		<input type="hidden" name="supplier_id" :value="selectedId"/>
+		<button
+			type="button"
+			@click="open = !open; if(open) $nextTick(() => $refs.supplierSearchInput.focus())"
+			class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+		>
+			<span class="truncate font-medium" :class="selectedId === 0 && !allowGeneral ? 'text-[#8E8E93]' : 'text-[#1D1D1F]'" x-text="selectedName"></span>
+			<svg class="w-4 h-4 text-[#8E8E93] flex-shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19.5 8.25-7.5 7.5-7.5-7.5"></path></svg>
+		</button>
+		<div
+			x-show="open"
+			x-cloak
+			class="absolute left-0 right-0 z-30 mt-1.5 bg-white border border-[#E5E5EA] rounded-2xl shadow-lg p-2 space-y-1"
+		>
+			<input
+				type="text"
+				x-ref="supplierSearchInput"
+				x-model="search"
+				placeholder="Ketik nama supplier..."
+				class="w-full px-3 py-2 bg-[#F5F5F7] rounded-xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-[#007AFF] transition"
+			/>
+			<div class="max-h-52 overflow-y-auto divide-y divide-[#E5E5EA]">
+				<template x-for="s in filtered()" :key="s.id">
+					<button
+						type="button"
+						@click="select(s)"
+						class="w-full text-left px-3 py-2.5 rounded-xl text-sm hover:bg-[#007AFF]/10 flex items-center justify-between transition"
+					>
+						<span :class="selectedId === s.id ? 'font-semibold text-[#007AFF]' : 'text-[#1D1D1F]'" x-text="s.name"></span>
+						<svg x-show="selectedId === s.id" class="w-4 h-4 text-[#007AFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m4.5 12.75 6 6 9-13.5"></path></svg>
+					</button>
+				</template>
+				<div x-show="filtered().length === 0" class="px-3 py-3 text-xs text-[#8E8E93] text-center">
+					Supplier tidak ditemukan
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+
+templ PurchaseOrderListPage(pos []repo.ListPurchasesRow, filter PurchaseFilter) {
+	@views.Base("Purchase Order (PO)", "purchase-orders") {
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+				<div>
+					<h1 class="text-3xl font-bold text-[#1D1D1F] tracking-tight">Purchase Order (PO)</h1>
+					<p class="text-sm text-[#8E8E93] mt-1">Daftar surat pesanan barang ke supplier (belum menambah stok sebelum diterima di menu Terima Barang)</p>
+				</div>
+				<a
+					href="/purchase-orders/new"
+					class="w-full sm:w-auto justify-center bg-[#007AFF] text-white px-5 min-h-[44px] inline-flex items-center rounded-xl font-medium hover:bg-[#0066D6] transition shadow-xs"
+				>
+					+ Buat Purchase Order
+				</a>
+			</div>
+
+			<div class="flex flex-col lg:flex-row gap-3 mb-4 items-stretch lg:items-center justify-between">
+				<div class="relative flex-1 max-w-md">
+					<input
+						type="text"
+						name="q"
+						value={ filter.Query }
+						placeholder="Cari No. PO, supplier, atau catatan..."
+						class="w-full pl-10 pr-4 min-h-[44px] bg-white border border-[#E5E5EA] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/purchase-orders"
+						hx-target="#po-table-container"
+						hx-swap="outerHTML"
+						hx-trigger="keyup changed delay:300ms, search"
+						hx-include="[name='status'], [name='payment'], [name='sort']"
+					/>
+					<svg class="w-5 h-5 text-[#8E8E93] absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+				</div>
+				<div class="flex flex-wrap items-center gap-2.5 text-sm">
+					<select
+						name="status"
+						class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/purchase-orders"
+						hx-target="#po-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='payment'], [name='sort']"
+					>
+						<option value="" selected?={ filter.Status == "" }>Status: Pending &amp; Batal</option>
+						<option value="pending" selected?={ filter.Status == "pending" }>Menunggu Dikirim (Pending)</option>
+						<option value="diterima" selected?={ filter.Status == "diterima" }>Sudah Diterima</option>
+						<option value="batal" selected?={ filter.Status == "batal" }>Dibatalkan</option>
+					</select>
+					<select
+						name="payment"
+						class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/purchase-orders"
+						hx-target="#po-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='status'], [name='sort']"
+					>
+						<option value="" selected?={ filter.Payment == "" }>Semua Pembayaran</option>
+						<option value="tunai" selected?={ filter.Payment == "tunai" }>Tunai</option>
+						<option value="transfer" selected?={ filter.Payment == "transfer" }>Transfer</option>
+						<option value="hutang" selected?={ filter.Payment == "hutang" }>Hutang</option>
+					</select>
+					<select
+						name="sort"
+						class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+						hx-get="/purchase-orders"
+						hx-target="#po-table-container"
+						hx-swap="outerHTML"
+						hx-include="[name='q'], [name='status'], [name='payment']"
+					>
+						<option value="date_desc" selected?={ filter.SortBy == "date_desc" }>Urut: Terbaru</option>
+						<option value="date_asc" selected?={ filter.SortBy == "date_asc" }>Urut: Terlama</option>
+						<option value="total_desc" selected?={ filter.SortBy == "total_desc" }>Nilai Tertinggi</option>
+						<option value="total_asc" selected?={ filter.SortBy == "total_asc" }>Nilai Terendah</option>
+					</select>
+				</div>
+			</div>
+
+			@PurchaseOrderTable(pos)
+		</div>
+	}
+}
+
+templ PurchaseOrderTable(pos []repo.ListPurchasesRow) {
+	<div id="po-table-container" class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] overflow-hidden">
+		<div class="overflow-x-auto">
+			<table class="w-full text-left border-collapse">
+				<thead class="bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]">
+					<tr>
+						<th class="py-3.5 px-6 font-medium">No. PO</th>
+						<th class="py-3.5 px-6 font-medium">Tanggal Pesan</th>
+						<th class="py-3.5 px-6 font-medium">Supplier</th>
+						<th class="py-3.5 px-6 font-medium">Pembayaran</th>
+						<th class="py-3.5 px-6 font-medium">Status</th>
+						<th class="py-3.5 px-6 font-medium text-right">Estimasi Total</th>
+						<th class="py-3.5 px-6 font-medium text-right">Aksi</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+					for _, p := range pos {
+						<tr class="hover:bg-[#F5F5F7]/50 transition">
+							<td class="py-3.5 px-6 font-mono font-semibold text-[#007AFF]">{ p.InvoiceNumber }</td>
+							<td class="py-3.5 px-6 text-gray-600 tabular-nums">{ formatDate(p.Date) }</td>
+							<td class="py-3.5 px-6 font-medium text-[#1D1D1F]">{ p.SupplierName }</td>
+							<td class="py-3.5 px-6">
+								<span class="px-2.5 py-1 rounded-md text-xs font-medium uppercase bg-[#F5F5F7] text-gray-700 border border-[#E5E5EA]">
+									{ p.PaymentMethod }
+								</span>
+							</td>
+							<td class="py-3.5 px-6">
+								if p.Status == "pending" {
+									<span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-[#FF9500]/15 text-[#FF9500]">
+										Menunggu Dikirim
+									</span>
+								} else if p.Status == "diterima" {
+									<span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-[#34C759]/15 text-[#34C759]">
+										Sudah Diterima
+									</span>
+								} else if p.Status == "batal" {
+									<span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-[#FF3B30]/15 text-[#FF3B30]">
+										Dibatalkan
+									</span>
+								}
+							</td>
+							<td class="py-3.5 px-6 text-right font-semibold text-[#1D1D1F] tabular-nums">Rp { utils.FormatRupiah(p.TotalCost) }</td>
+							<td class="py-3.5 px-6 text-right">
+								<div class="flex items-center justify-end gap-2">
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/purchase-orders/%d", p.ID)) }
+										class="inline-flex items-center justify-center px-3.5 min-h-[44px] rounded-xl text-sm font-medium bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/10 transition"
+									>
+										Detail
+									</a>
+									if p.Status == "pending" {
+										<a
+											href={ templ.SafeURL(fmt.Sprintf("/goods-receipts/from-po/%d", p.ID)) }
+											class="inline-flex items-center justify-center px-3.5 min-h-[44px] rounded-xl text-sm font-medium bg-[#34C759] text-white hover:bg-[#2DB14E] transition shadow-xs"
+										>
+											Terima Barang
+										</a>
+									}
+								</div>
+							</td>
+						</tr>
+					}
+					if len(pos) == 0 {
+						<tr>
+							<td colspan="7" class="py-8 text-center text-[#8E8E93]">
+								Tidak ada Purchase Order (PO) yang ditemukan.
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+}
+
+templ CreatePurchaseOrderPage(
+	suppliers []repo.Supplier,
+	products []repo.Product,
+	units []repo.ListAllActiveProductUnitsWithLastCostRow,
+	defaultInvoice string,
+) {
+	@views.Base("Buat Purchase Order (PO)", "purchase-orders") {
+		<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<div
+				class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8"
+				x-data={ fmt.Sprintf(`purchaseFormState(%s)`, buildCatalogJSON(products, units)) }
+			>
+				<div class="flex items-center gap-3 mb-6">
+					<a href="/purchase-orders" class="min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition">
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+					</a>
+					<div>
+						<h2 class="text-2xl font-bold text-[#1D1D1F]">Buat Purchase Order (PO) Baru</h2>
+						<p class="text-sm text-[#8E8E93]">Pesanan ke supplier berstatus Pending dan belum menambah stok gudang</p>
+					</div>
+				</div>
+
+				<form
+					hx-post="/purchase-orders"
+					hx-on::config-request="let supVal = parseInt($el.querySelector('input[name=supplier_id]').value || '0'); if (supVal <= 0) { event.preventDefault(); alert('Purchase Order wajib memilih supplier dari daftar master data. Silakan pilih vendor tujuan terlebih dahulu.'); }"
+					class="space-y-6"
+				>
+					<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-[#F5F5F7] rounded-2xl border border-[#E5E5EA]">
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Nomor PO</label>
+							<input
+								type="text"
+								name="invoice_number"
+								value={ defaultInvoice }
+								required
+								class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							/>
+						</div>
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Supplier <span class="text-[#FF3B30]">*</span></label>
+							@SupplierCombobox(suppliers, 0, false)
+						</div>
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Rencana Pembayaran</label>
+							<select
+								name="payment_method"
+								class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							>
+								<option value="tunai">Tunai (Cash)</option>
+								<option value="transfer">Transfer Bank</option>
+								<option value="hutang">Hutang (Tempo)</option>
+							</select>
+						</div>
+					</div>
+
+					@ProductSearchAndTable("Daftar Barang yang Dipesan")
+
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-[#E5E5EA] items-center">
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Catatan PO (Opsional)</label>
+							<input
+								type="text"
+								name="notes"
+								placeholder="Misal: Kirim hari Kamis pagi..."
+								class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							/>
+						</div>
+						<div class="text-right">
+							<span class="text-sm text-[#8E8E93] block">Estimasi Total PO</span>
+							<span class="text-2xl font-bold text-[#1D1D1F] tabular-nums" x-text="'Rp ' + formatRupiah(grandTotal())">Rp 0</span>
+						</div>
+					</div>
+
+					<div class="flex justify-end gap-3 pt-4">
+						<a
+							href="/purchase-orders"
+							class="px-5 min-h-[44px] inline-flex items-center rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-medium hover:bg-[#F5F5F7] transition"
+						>
+							Batal
+						</a>
+						<button
+							type="submit"
+							:disabled="rows.length === 0"
+							:class="rows.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#0066D6]'"
+							class="bg-[#007AFF] text-white px-6 min-h-[44px] rounded-xl font-semibold transition shadow-xs"
+						>
+							Simpan Purchase Order (PO)
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+		@PurchaseCatalogScript()
+	}
+}
+
+templ PurchaseOrderDetailPage(purchase repo.GetPurchaseByIDRow, items []repo.GetPurchaseDetailsRow) {
+	@views.Base("Detail Purchase Order", "purchase-orders") {
+		<div
+			x-data={ fmt.Sprintf(`{
+				showWAModal: false,
+				phone: %q,
+				sending: false,
+				cooldown: 0,
+				timer: null,
+				statusMsg: '',
+				isError: false,
+				async sendWA() {
+					if (this.cooldown > 0) return;
+					if (!this.phone.trim()) {
+						this.statusMsg = 'Nomor WhatsApp tidak boleh kosong!';
+						this.isError = true;
+						return;
+					}
+					this.sending = true;
+					this.statusMsg = '';
+					try {
+						let res = await fetch('/purchase-orders/%d/send-whatsapp', {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ phone: this.phone.trim() })
+						});
+						let data = await res.json();
+						if (data.success) {
+							this.statusMsg = 'Purchase Order berhasil dikirim ke WhatsApp vendor!';
+							this.isError = false;
+							this.cooldown = 10;
+							if (this.timer) clearInterval(this.timer);
+							this.timer = setInterval(() => {
+								this.cooldown--;
+								if (this.cooldown <= 0) {
+									clearInterval(this.timer);
+									this.timer = null;
+								}
+							}, 1000);
+						} else {
+							this.statusMsg = 'Gagal: ' + (data.message || 'Terjadi kesalahan');
+							this.isError = true;
+						}
+					} catch(e) {
+						this.statusMsg = 'Kesalahan jaringan: ' + e.message;
+						this.isError = true;
+					} finally {
+						this.sending = false;
+					}
+				}
+			}`, purchase.SupplierPhone, purchase.ID) }
+			class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+		>
+			<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8">
+				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#E5E5EA]">
+					<div class="flex items-center gap-3">
+						<a href="/purchase-orders" class="min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition">
+							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+						</a>
+						<div>
+							<div class="flex items-center gap-2.5">
+								<h2 class="text-2xl font-bold text-[#1D1D1F] font-mono">{ purchase.InvoiceNumber }</h2>
+								if purchase.Status == "pending" {
+									<span class="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-[#FF9500]/15 text-[#FF9500]">PO Pending</span>
+								} else if purchase.Status == "diterima" {
+									<span class="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-[#34C759]/15 text-[#34C759]">Sudah Diterima</span>
+								} else {
+									<span class="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-[#FF3B30]/15 text-[#FF3B30]">Dibatalkan</span>
+								}
+							</div>
+							<p class="text-sm text-[#8E8E93] mt-0.5 tabular-nums">Tanggal PO: { formatDate(purchase.Date) }</p>
+						</div>
+					</div>
+					<div class="flex items-center gap-2">
+						<button
+							type="button"
+							@click="showWAModal = true; statusMsg = ''"
+							:disabled="cooldown > 0"
+							class="min-h-[44px] px-3.5 rounded-xl bg-[#25D366] text-white font-medium text-sm inline-flex items-center gap-1.5 hover:bg-[#1EBE5D] transition shadow-xs disabled:opacity-50"
+							title="Kirim PO via WhatsApp ke Vendor"
+						>
+							<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.173.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.176.582 4.217 1.597 5.975l-1.605 5.869 6.046-1.587c1.705.938 3.665 1.473 5.751 1.473 6.627 0 12-5.373 12-12 0-6.628-5.373-12-11.789-12z"></path></svg>
+							<span x-text="cooldown > 0 ? 'Tunggu (' + cooldown + 's)' : 'Kirim WA'"></span>
+						</button>
+						<a
+							href={ templ.SafeURL(fmt.Sprintf("/purchase-orders/%d/print", purchase.ID)) }
+							target="_blank"
+							class="min-h-[44px] px-3.5 rounded-xl border border-[#E5E5EA] bg-white text-[#1D1D1F] font-medium text-sm inline-flex items-center gap-1.5 hover:bg-black/5 transition shadow-2xs"
+							title="Cetak atau Simpan PDF Purchase Order"
+						>
+							<svg class="w-4 h-4 text-[#8E8E93]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+							<span>Cetak PO</span>
+						</a>
+						if purchase.Status == "pending" {
+							<button
+								type="button"
+								hx-post={ fmt.Sprintf("/purchase-orders/%d/cancel", purchase.ID) }
+								hx-confirm="Batalkan Purchase Order ini?"
+								class="px-4 min-h-[44px] rounded-xl bg-[#FF3B30]/10 text-[#FF3B30] text-sm font-medium hover:bg-[#FF3B30]/20 transition"
+							>
+								Batalkan PO
+							</button>
+							<a
+								href={ templ.SafeURL(fmt.Sprintf("/goods-receipts/from-po/%d", purchase.ID)) }
+								class="bg-[#34C759] text-white px-4 min-h-[44px] inline-flex items-center rounded-xl text-sm font-semibold hover:bg-[#2DB14E] transition shadow-xs"
+							>
+								Proses Terima Barang
+							</a>
+						}
+					</div>
+				</div>
+
+				@PurchaseSummaryAndItemsTable(purchase, items)
+			</div>
+
+			<div
+				x-show="showWAModal"
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/50 backdrop-blur-xs"
+				@click.self="showWAModal = false"
+			>
+				<div class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-md overflow-hidden flex flex-col p-6 space-y-4 my-auto sm:my-8">
+					<div class="flex items-center justify-between pb-3 border-b border-[#E5E5EA]">
+						<div class="flex items-center gap-2">
+							<div class="w-8 h-8 rounded-full bg-[#25D366]/15 flex items-center justify-center text-[#25D366]">
+								<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.173.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.176.582 4.217 1.597 5.975l-1.605 5.869 6.046-1.587c1.705.938 3.665 1.473 5.751 1.473 6.627 0 12-5.373 12-12 0-6.628-5.373-12-11.789-12z"></path></svg>
+							</div>
+							<h3 class="font-bold text-[#1D1D1F]">Kirim PO ke WhatsApp Vendor</h3>
+						</div>
+						<button type="button" @click="showWAModal = false" class="text-[#8E8E93] hover:text-[#1D1D1F] p-1 rounded-lg">
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+
+					<div class="space-y-3">
+						<div class="bg-[#F5F5F7] p-3 rounded-xl border border-[#E5E5EA]">
+							<p class="text-xs text-[#8E8E93]">Vendor Tujuan:</p>
+							<p class="text-sm font-bold text-[#1D1D1F]">{ purchase.SupplierName }</p>
+						</div>
+
+						<div>
+							<label class="block text-xs font-semibold text-[#8E8E93] mb-1">Nomor WhatsApp Tujuan</label>
+							<input
+								type="text"
+								x-model="phone"
+								placeholder="Contoh: 08123456789"
+								class="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-transparent rounded-xl text-sm font-medium outline-none focus:bg-white focus:border-[#25D366] tabular-nums"
+							/>
+							<p class="text-[11px] text-[#8E8E93] mt-1">Nomor otomatis terisi dari master data supplier. Anda dapat mengubahnya jika ingin mengirim ke nomor staf/sales lain.</p>
+						</div>
+
+						<template x-if="statusMsg">
+							<div :class="isError ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'" class="p-2.5 rounded-xl border text-xs">
+								<p x-text="statusMsg"></p>
+							</div>
+						</template>
+					</div>
+
+					<div class="flex gap-2 pt-2">
+						<button
+							type="button"
+							@click="showWAModal = false"
+							class="flex-1 py-2.5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] text-xs font-semibold hover:bg-black/5 transition"
+						>
+							Batal
+						</button>
+						<button
+							type="button"
+							@click="sendWA()"
+							:disabled="sending || cooldown > 0 || !phone.trim()"
+							class="flex-1 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs disabled:opacity-50"
+						>
+							<svg x-show="!sending && cooldown === 0" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.173.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.176.582 4.217 1.597 5.975l-1.605 5.869 6.046-1.587c1.705.938 3.665 1.473 5.751 1.473 6.627 0 12-5.373 12-12 0-6.628-5.373-12-11.789-12z"></path></svg>
+							<span x-text="sending ? 'Mengirim...' : (cooldown > 0 ? 'Tunggu (' + cooldown + 's)' : 'Kirim Pesanan')"></span>
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+
+templ GoodsReceiptListPage(pendingPOs []repo.ListPurchasesRow, receipts []repo.ListPurchasesRow, filter PurchaseFilter) {
+	@views.Base("Terima Barang", "goods-receipts") {
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+			<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+				<div>
+					<h1 class="text-3xl font-bold text-[#1D1D1F] tracking-tight">Terima Barang (Stok Masuk)</h1>
+					<p class="text-sm text-[#8E8E93] mt-1">Penerimaan fisik barang dari PO maupun pembelian langsung yang menambah stok & HPP</p>
+				</div>
+				<a
+					href="/goods-receipts/new"
+					class="w-full sm:w-auto justify-center bg-[#007AFF] text-white px-5 min-h-[44px] inline-flex items-center rounded-xl font-medium hover:bg-[#0066D6] transition shadow-xs"
+				>
+					+ Terima Barang Langsung (Tanpa PO)
+				</a>
+			</div>
+
+			if len(pendingPOs) > 0 {
+				<div class="bg-[#FF9500]/10 rounded-2xl border border-[#FF9500]/30 p-5">
+					<div class="flex items-center justify-between mb-3">
+						<div>
+							<h2 class="text-base font-bold text-[#1D1D1F]">Purchase Order (PO) Menunggu Diterima ({ fmt.Sprint(len(pendingPOs)) })</h2>
+							<p class="text-xs text-[#8E8E93]">Klik "Konfirmasi Terima" saat barang dari supplier tiba di toko</p>
+						</div>
+					</div>
+					<div class="bg-white rounded-xl border border-[#E5E5EA] overflow-x-auto">
+						<table class="w-full text-left border-collapse">
+							<thead class="bg-[#F5F5F7]/70 border-b border-[#E5E5EA] text-[#8E8E93] text-sm">
+								<tr>
+									<th class="py-3 px-6 font-medium">No. PO</th>
+									<th class="py-3 px-6 font-medium">Tanggal PO</th>
+									<th class="py-3 px-6 font-medium">Supplier</th>
+									<th class="py-3 px-6 font-medium text-right">Estimasi Nilai</th>
+									<th class="py-3 px-6 font-medium text-right">Aksi</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+								for _, po := range pendingPOs {
+									<tr class="hover:bg-[#F5F5F7]/50 transition">
+										<td class="py-3 px-6 font-mono font-semibold text-[#007AFF]">{ po.InvoiceNumber }</td>
+										<td class="py-3 px-6 text-gray-600 tabular-nums">{ formatDate(po.Date) }</td>
+										<td class="py-3 px-6 font-medium text-[#1D1D1F]">{ po.SupplierName }</td>
+										<td class="py-3 px-6 text-right font-semibold text-[#1D1D1F] tabular-nums">Rp { utils.FormatRupiah(po.TotalCost) }</td>
+										<td class="py-3 px-6 text-right">
+											<a
+												href={ templ.SafeURL(fmt.Sprintf("/goods-receipts/from-po/%d", po.ID)) }
+												class="inline-flex items-center justify-center px-4 min-h-[44px] rounded-xl text-sm font-semibold bg-[#34C759] text-white hover:bg-[#2DB14E] transition shadow-xs"
+											>
+												Konfirmasi Terima
+											</a>
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			}
+
+			<div class="space-y-4">
+				<div
+					class="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between"
+					x-data={ fmt.Sprintf("{ period: %q }", filter.Period) }
+				>
+					<div class="relative flex-1 max-w-md">
+						<input
+							type="text"
+							name="q"
+							value={ filter.Query }
+							placeholder="Cari No. Referensi, supplier, atau catatan..."
+							class="w-full pl-10 pr-4 min-h-[44px] bg-white border border-[#E5E5EA] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							hx-get="/goods-receipts"
+							hx-target="#gr-table-container"
+							hx-swap="outerHTML"
+							hx-trigger="keyup changed delay:300ms, search"
+							hx-include="[name='payment'], [name='sort'], [name='period'], [name='from'], [name='to']"
+						/>
+						<svg class="w-5 h-5 text-[#8E8E93] absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+					</div>
+					<div class="flex flex-wrap items-center gap-2.5 text-sm">
+						<select
+							name="period"
+							x-model="period"
+							class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							hx-get="/goods-receipts"
+							hx-target="#gr-table-container"
+							hx-swap="outerHTML"
+							hx-include="[name='q'], [name='payment'], [name='sort'], [name='from'], [name='to']"
+						>
+							<option value="30_days" selected?={ filter.Period == "30_days" || filter.Period == "" }>30 Hari Terakhir</option>
+							<option value="today" selected?={ filter.Period == "today" }>Hari Ini</option>
+							<option value="this_month" selected?={ filter.Period == "this_month" }>Bulan Ini</option>
+							<option value="all" selected?={ filter.Period == "all" }>Semua Waktu</option>
+							<option value="custom" selected?={ filter.Period == "custom" }>Rentang Tanggal</option>
+						</select>
+
+						<div x-show="period === 'custom'" x-cloak class="flex items-center gap-1.5">
+							<input
+								type="date"
+								name="from"
+								value={ filter.From }
+								class="border border-[#E5E5EA] rounded-xl px-2.5 min-h-[44px] bg-white text-[#1D1D1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+								hx-get="/goods-receipts"
+								hx-target="#gr-table-container"
+								hx-swap="outerHTML"
+								hx-trigger="change"
+								hx-include="[name='q'], [name='payment'], [name='sort'], [name='period'], [name='to']"
+							/>
+							<span class="text-xs text-[#8E8E93]">s/d</span>
+							<input
+								type="date"
+								name="to"
+								value={ filter.To }
+								class="border border-[#E5E5EA] rounded-xl px-2.5 min-h-[44px] bg-white text-[#1D1D1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+								hx-get="/goods-receipts"
+								hx-target="#gr-table-container"
+								hx-swap="outerHTML"
+								hx-trigger="change"
+								hx-include="[name='q'], [name='payment'], [name='sort'], [name='period'], [name='from']"
+							/>
+						</div>
+
+						<select
+							name="payment"
+							class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							hx-get="/goods-receipts"
+							hx-target="#gr-table-container"
+							hx-swap="outerHTML"
+							hx-include="[name='q'], [name='sort'], [name='period'], [name='from'], [name='to']"
+						>
+							<option value="" selected?={ filter.Payment == "" }>Semua Pembayaran</option>
+							<option value="tunai" selected?={ filter.Payment == "tunai" }>Tunai</option>
+							<option value="transfer" selected?={ filter.Payment == "transfer" }>Transfer</option>
+							<option value="hutang" selected?={ filter.Payment == "hutang" }>Hutang</option>
+						</select>
+						<select
+							name="sort"
+							class="border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							hx-get="/goods-receipts"
+							hx-target="#gr-table-container"
+							hx-swap="outerHTML"
+							hx-include="[name='q'], [name='payment'], [name='period'], [name='from'], [name='to']"
+						>
+							<option value="date_desc" selected?={ filter.SortBy == "date_desc" }>Urut: Terbaru Diterima</option>
+							<option value="date_asc" selected?={ filter.SortBy == "date_asc" }>Urut: Terlama Diterima</option>
+							<option value="total_desc" selected?={ filter.SortBy == "total_desc" }>Nilai Tertinggi</option>
+							<option value="total_asc" selected?={ filter.SortBy == "total_asc" }>Nilai Terendah</option>
+						</select>
+					</div>
+				</div>
+
+				@GoodsReceiptTable(receipts)
+			</div>
+		</div>
+	}
+}
+
+templ GoodsReceiptTable(receipts []repo.ListPurchasesRow) {
+	<div id="gr-table-container" class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] overflow-hidden">
+		<div class="px-6 py-4 border-b border-[#E5E5EA]">
+			<h2 class="text-base font-bold text-[#1D1D1F]">Riwayat Barang Diterima (Selesai Masuk Stok)</h2>
+		</div>
+		<div class="overflow-x-auto">
+			<table class="w-full text-left border-collapse">
+				<thead class="bg-[#F5F5F7]/70 border-b border-[#E5E5EA] text-[#8E8E93] text-sm">
+					<tr>
+						<th class="py-3.5 px-6 font-medium">No. Referensi</th>
+						<th class="py-3.5 px-6 font-medium">Waktu Diterima</th>
+						<th class="py-3.5 px-6 font-medium">Supplier</th>
+						<th class="py-3.5 px-6 font-medium">Status</th>
+						<th class="py-3.5 px-6 font-medium">Pembayaran</th>
+						<th class="py-3.5 px-6 font-medium text-right">Total Nilai</th>
+						<th class="py-3.5 px-6 font-medium text-right">Aksi</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+					for _, r := range receipts {
+						<tr class="hover:bg-[#F5F5F7]/50 transition">
+							<td class="py-3.5 px-6 font-mono font-semibold">
+								if r.Status == "batal" {
+									<span class="text-[#FF3B30] line-through">{ r.InvoiceNumber }</span>
+								} else {
+									<span class="text-[#34C759]">{ r.InvoiceNumber }</span>
+								}
+							</td>
+							<td class="py-3.5 px-6 text-gray-600 tabular-nums">{ formatDate(r.ReceivedAt) }</td>
+							<td class="py-3.5 px-6 font-medium text-[#1D1D1F]">{ r.SupplierName }</td>
+							<td class="py-3.5 px-6">
+								if r.Status == "batal" {
+									<span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-[#FF3B30]/15 text-[#FF3B30]">
+										Batal (Void)
+									</span>
+								} else {
+									<span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-[#34C759]/15 text-[#34C759]">
+										Diterima
+									</span>
+								}
+							</td>
+							<td class="py-3.5 px-6">
+								<span class="px-2.5 py-1 rounded-md text-xs font-medium uppercase bg-[#F5F5F7] text-gray-700 border border-[#E5E5EA]">
+									{ r.PaymentMethod }
+								</span>
+							</td>
+							<td class="py-3.5 px-6 text-right font-semibold text-[#1D1D1F] tabular-nums">Rp { utils.FormatRupiah(r.TotalCost) }</td>
+							<td class="py-3.5 px-6 text-right">
+								<a
+									href={ templ.SafeURL(fmt.Sprintf("/goods-receipts/%d", r.ID)) }
+									class="inline-flex items-center justify-center px-3.5 min-h-[44px] rounded-xl text-sm font-medium bg-[#F5F5F7] text-[#1D1D1F] hover:bg-black/10 transition"
+								>
+									Detail Nota
+								</a>
+							</td>
+						</tr>
+					}
+					if len(receipts) == 0 {
+						<tr>
+							<td colspan="7" class="py-8 text-center text-[#8E8E93]">
+								Tidak ada riwayat penerimaan barang yang ditemukan.
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+}
+
+templ CreateGoodsReceiptPage(
+	suppliers []repo.Supplier,
+	products []repo.Product,
+	units []repo.ListAllActiveProductUnitsWithLastCostRow,
+	pendingPOs []repo.ListPurchasesRow,
+	defaultInvoice string,
+) {
+	@views.Base("Terima Barang Langsung", "goods-receipts") {
+		<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<div
+				class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8"
+				x-data={ fmt.Sprintf(`purchaseFormState(%s)`, buildCatalogJSON(products, units)) }
+			>
+				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+					<div class="flex items-center gap-3">
+						<a href="/goods-receipts" class="min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition">
+							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+						</a>
+						<div>
+							<h2 class="text-2xl font-bold text-[#1D1D1F]">Terima Barang Langsung (Tanpa PO)</h2>
+							<p class="text-sm text-[#8E8E93]">Stok gudang dan HPP Moving Average akan langsung bertambah saat disimpan</p>
+						</div>
+					</div>
+
+					if len(pendingPOs) > 0 {
+						<div class="flex items-center gap-2">
+							<select
+								onchange="if(this.value) window.location.href = '/goods-receipts/from-po/' + this.value"
+								class="bg-[#FF9500]/10 border border-[#FF9500]/30 text-[#1D1D1F] text-xs font-semibold rounded-xl px-3.5 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-[#FF9500]"
+							>
+								<option value="">-- Atau Pilih dari PO Pending ({ fmt.Sprint(len(pendingPOs)) }) --</option>
+								for _, po := range pendingPOs {
+									<option value={ fmt.Sprint(po.ID) }>{ po.InvoiceNumber } - { po.SupplierName }</option>
+								}
+							</select>
+						</div>
+					}
+				</div>
+
+				<form
+					hx-post="/goods-receipts"
+					hx-on::config-request="let supVal = parseInt($el.querySelector('input[name=supplier_id]').value || '0'); if (supVal <= 0) { if (!confirm('PERHATIAN: Penerimaan barang ini akan dicatat sebagai \'Supplier Umum\' (tanpa nama vendor). Tetap ingin melanjutkan simpan barang masuk?')) { event.preventDefault(); } }"
+					class="space-y-6"
+				>
+					<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-[#F5F5F7] rounded-2xl border border-[#E5E5EA]">
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Nomor Nota / Faktur Supplier</label>
+							<input
+								type="text"
+								name="invoice_number"
+								value={ defaultInvoice }
+								required
+								class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							/>
+						</div>
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Supplier</label>
+							@SupplierCombobox(suppliers, 0, true)
+						</div>
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Metode Pembayaran</label>
+							<select
+								name="payment_method"
+								class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							>
+								<option value="tunai">Tunai (Cash)</option>
+								<option value="transfer">Transfer Bank</option>
+								<option value="hutang">Hutang (Tempo)</option>
+							</select>
+						</div>
+					</div>
+
+					@ProductSearchAndTable("Daftar Barang Fisik yang Diterima")
+
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-[#E5E5EA] items-center">
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Catatan Penerimaan (Opsional)</label>
+							<input
+								type="text"
+								name="notes"
+								placeholder="Misal: Nota fisik titip supir..."
+								class="w-full bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							/>
+						</div>
+						<div class="text-right">
+							<span class="text-sm text-[#8E8E93] block">Total Nilai Pembelian</span>
+							<span class="text-2xl font-bold text-[#1D1D1F] tabular-nums" x-text="'Rp ' + formatRupiah(grandTotal())">Rp 0</span>
+						</div>
+					</div>
+
+					<div class="flex justify-end gap-3 pt-4">
+						<a
+							href="/goods-receipts"
+							class="px-5 min-h-[44px] inline-flex items-center rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-medium hover:bg-[#F5F5F7] transition"
+						>
+							Batal
+						</a>
+						<button
+							type="submit"
+							:disabled="rows.length === 0"
+							:class="rows.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#2DB14E]'"
+							class="bg-[#34C759] text-white px-6 min-h-[44px] rounded-xl font-semibold transition shadow-xs"
+						>
+							Simpan & Tambah Stok
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+		@PurchaseCatalogScript()
+	}
+}
+
+templ ReceiveFromPOPage(purchase repo.GetPurchaseByIDRow, items []repo.GetPurchaseDetailsRow) {
+	@views.Base("Konfirmasi Terima Barang dari PO", "goods-receipts") {
+		<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8">
+				<div class="flex items-center gap-3 mb-6">
+					<a href="/goods-receipts" class="min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition">
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+					</a>
+					<div>
+						<h2 class="text-2xl font-bold text-[#1D1D1F]">Konfirmasi Terima Barang dari PO ({ purchase.InvoiceNumber })</h2>
+						<p class="text-sm text-[#8E8E93]">Supplier: <strong class="text-[#1D1D1F]">{ purchase.SupplierName }</strong> • Tanggal PO: { formatDate(purchase.Date) }</p>
+					</div>
+				</div>
+
+				<div class="p-4 mb-6 bg-[#007AFF]/10 border border-[#007AFF]/20 rounded-xl text-xs text-[#1D1D1F]">
+					<strong>Penerimaan Sebagian (Per Baris):</strong> Jika <em>Qty Fisik Diterima</em> lebih sedikit dari <em>Qty Pesan</em>, secara default PO akan diselesaikan sesuai jumlah fisik yang diterima, atau Anda dapat memilih <strong>Buat Backorder</strong> pada baris tersebut.
+				</div>
+
+				<form hx-post={ fmt.Sprintf("/goods-receipts/from-po/%d", purchase.ID) } class="space-y-6">
+					<div class="overflow-x-auto border border-[#E5E5EA] rounded-2xl">
+						<table class="w-full text-left border-collapse">
+							<thead class="bg-[#F5F5F7]/70 border-b border-[#E5E5EA] text-sm font-medium text-[#8E8E93]">
+								<tr>
+									<th class="py-3.5 px-4">Barang</th>
+									<th class="py-3.5 px-4">Satuan</th>
+									<th class="py-3.5 px-4 text-right">Qty Pesan (PO)</th>
+									<th class="py-3.5 px-4 text-right w-36">Qty Fisik Diterima</th>
+									<th class="py-3.5 px-4 w-56">Status Sisa (Jika Kurang)</th>
+									<th class="py-3.5 px-4 text-right w-48">Harga Beli Aktual / Satuan</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+								for _, item := range items {
+									<tr x-data={ fmt.Sprintf("{ ordered: %d, received: %d, action: 'close' }", item.Qty, item.Qty) }>
+										<td class="py-3.5 px-4">
+											<input type="hidden" name="detail_ids[]" value={ fmt.Sprint(item.ID) }/>
+											<div class="font-semibold text-[#1D1D1F]">{ item.ProductName }</div>
+											<div class="text-xs text-[#8E8E93] font-mono">{ item.Sku }</div>
+										</td>
+										<td class="py-3.5 px-4">
+											<span class="px-2.5 py-1 rounded-md bg-[#F5F5F7] text-[#1D1D1F] font-medium text-xs border border-[#E5E5EA]">
+												{ item.UnitName }
+											</span>
+											if item.ConversionQty > 1 {
+												<div class="text-xs text-[#8E8E93] mt-0.5 tabular-nums">Isi { fmt.Sprint(item.ConversionQty) }</div>
+											}
+										</td>
+										<td class="py-3.5 px-4 text-right font-bold text-gray-600 tabular-nums">
+											{ fmt.Sprint(item.Qty) }
+										</td>
+										<td class="py-3.5 px-4">
+											<input
+												type="number"
+												name="received_qtys[]"
+												min="0"
+												x-model.number="received"
+												required
+												class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] text-sm text-right tabular-nums font-bold text-[#34C759] focus:outline-none focus:ring-2 focus:ring-[#34C759]"
+											/>
+										</td>
+										<td class="py-3.5 px-4">
+											<input type="hidden" name="shortage_actions[]" :value="received < ordered ? action : 'close'"/>
+											<div x-show="received >= ordered" class="text-xs font-semibold text-[#34C759] bg-[#34C759]/10 rounded-xl px-3 min-h-[44px] flex items-center justify-center">
+												Lengkap (Tidak ada sisa)
+											</div>
+											<div x-show="received < ordered" x-cloak>
+												<select
+													x-model="action"
+													class="w-full bg-[#FF9500]/10 border border-[#FF9500]/30 text-[#1D1D1F] rounded-xl px-2.5 min-h-[44px] text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#FF9500]"
+												>
+													<option value="close" x-text="'Tutup / Selesai di Qty ' + (received || 0)"></option>
+													<option value="backorder" x-text="'Buat Backorder (Sisa ' + (ordered - (received || 0)) + ')'"></option>
+												</select>
+											</div>
+										</td>
+										<td class="py-3.5 px-4">
+											<input
+												type="number"
+												name="actual_costs[]"
+												min="0"
+												step="any"
+												value={ utils.FormatPlainFloat(item.Cost) }
+												required
+												class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] text-sm text-right tabular-nums font-semibold focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+											/>
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-[#F5F5F7] rounded-2xl border border-[#E5E5EA]">
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Metode Pembayaran Aktual</label>
+							<select
+								name="payment_method"
+								class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							>
+								<option value="tunai" selected?={ purchase.PaymentMethod == "tunai" }>Tunai (Cash)</option>
+								<option value="transfer" selected?={ purchase.PaymentMethod == "transfer" }>Transfer Bank</option>
+								<option value="hutang" selected?={ purchase.PaymentMethod == "hutang" }>Hutang (Tempo)</option>
+							</select>
+						</div>
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Catatan Penerimaan</label>
+							<input
+								type="text"
+								name="notes"
+								value={ purchase.Notes }
+								placeholder="Catatan kondisi barang / pengirim..."
+								class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+							/>
+						</div>
+					</div>
+
+					<div class="flex justify-end gap-3 pt-2">
+						<a
+							href="/goods-receipts"
+							class="px-5 min-h-[44px] inline-flex items-center rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-medium hover:bg-[#F5F5F7] transition"
+						>
+							Batal
+						</a>
+						<button
+							type="submit"
+							class="bg-[#34C759] text-white px-6 min-h-[44px] rounded-xl font-semibold hover:bg-[#2DB14E] transition shadow-xs"
+						>
+							Konfirmasi Barang Masuk & Update Stok
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
+
+templ GoodsReceiptDetailPage(purchase repo.GetPurchaseByIDRow, items []repo.GetPurchaseDetailsRow) {
+	@views.Base("Detail Penerimaan Barang", "goods-receipts") {
+		<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8">
+				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#E5E5EA]">
+					<div class="flex items-center gap-3">
+						<a href="/goods-receipts" class="min-w-[44px] min-h-[44px] -ml-2 inline-flex items-center justify-center rounded-xl text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 transition">
+							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+						</a>
+						<div>
+							<div class="flex items-center gap-2.5">
+								<h2 class="text-2xl font-bold text-[#1D1D1F] font-mono">{ purchase.InvoiceNumber }</h2>
+								if purchase.Status == "diterima" {
+									<span class="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-[#34C759]/15 text-[#34C759]">Diterima (Stok Masuk)</span>
+								} else if purchase.Status == "batal" {
+									<span class="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-[#FF3B30]/15 text-[#FF3B30]">Dibatalkan (Void)</span>
+								} else {
+									<span class="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-[#FF9500]/15 text-[#FF9500]">{ purchase.Status }</span>
+								}
+							</div>
+							<p class="text-sm text-[#8E8E93] mt-0.5 tabular-nums">Waktu Diterima: { formatDate(purchase.ReceivedAt) }</p>
+						</div>
+					</div>
+					<div class="flex items-center gap-2">
+						if purchase.Status == "diterima" {
+							<button
+								type="button"
+								hx-post={ fmt.Sprintf("/goods-receipts/%d/void", purchase.ID) }
+								hx-confirm="PERINGATAN: Membatalkan penerimaan barang ini akan memotong kembali stok barang di gudang. Lanjutkan membatalkan penerimaan (void)?"
+								hx-on::response-error="alert(event.detail.xhr.responseText || 'Gagal membatalkan penerimaan')"
+								class="min-h-[44px] px-4 rounded-xl bg-[#FF3B30]/10 text-[#FF3B30] hover:bg-[#FF3B30]/20 font-semibold text-sm inline-flex items-center gap-2 transition"
+							>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+								<span>Batalkan Penerimaan (Void)</span>
+							</button>
+						} else if purchase.Status == "batal" && strings.HasPrefix(purchase.InvoiceNumber, "PO-") {
+							<button
+								type="button"
+								hx-post={ fmt.Sprintf("/goods-receipts/%d/reopen-po", purchase.ID) }
+								hx-confirm="Buka ulang PO ini menjadi pending agar dapat diterima kembali dengan data yang benar?"
+								hx-on::response-error="alert(event.detail.xhr.responseText || 'Gagal membuka ulang PO')"
+								class="min-h-[44px] px-4 rounded-xl bg-[#007AFF] text-white hover:bg-[#0062CC] font-semibold text-sm inline-flex items-center gap-2 transition shadow-xs"
+							>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+								<span>Buka Ulang PO (Jadikan Pending)</span>
+							</button>
+						}
+					</div>
+				</div>
+
+				@PurchaseSummaryAndItemsTable(purchase, items)
+			</div>
+		</div>
+	}
+}
+
+
+templ ProductSearchAndTable(sectionTitle string) {
+	<div class="space-y-4">
+		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+			<h3 class="text-base font-bold text-[#1D1D1F]">{ sectionTitle }</h3>
+			<span class="text-xs text-[#8E8E93]">Harga beli otomatis terisi dari riwayat harga beli terakhir</span>
+		</div>
+
+		<div class="relative" @click.outside="showDropdown = false">
+			<div class="relative">
+				<input
+					type="text"
+					x-ref="searchInput"
+					x-model="searchQuery"
+					@focus="showDropdown = true"
+					@input="showDropdown = true"
+					@keydown.enter.prevent="handleEnterSearch()"
+					@keydown.escape="showDropdown = false"
+					placeholder="Ketik Nama Barang / SKU atau Scan Barcode lalu tekan Enter..."
+					class="w-full pl-11 pr-4 min-h-[48px] bg-[#007AFF]/5 border-2 border-[#007AFF]/20 rounded-xl text-[15px] font-medium text-[#1D1D1F] placeholder-[#8E8E93] focus:bg-white focus:outline-none focus:border-[#007AFF] transition"
+				/>
+				<svg class="w-5 h-5 text-[#007AFF] absolute left-3.5 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+				</svg>
+			</div>
+
+			<div
+				x-show="showDropdown && searchQuery.trim().length > 0"
+				x-cloak
+				class="absolute left-0 right-0 mt-1.5 bg-white/95 backdrop-blur-xl border border-[#E5E5EA] rounded-2xl shadow-lg max-h-64 overflow-y-auto z-30 divide-y divide-[#E5E5EA]"
+			>
+				<template x-for="prod in filteredProducts()" :key="prod.id">
+					<button
+						type="button"
+						@click="selectProduct(prod)"
+						class="w-full px-4 py-3 text-left hover:bg-[#007AFF]/10 flex items-center justify-between transition"
+					>
+						<div>
+							<div class="font-semibold text-[15px] text-[#1D1D1F]" x-text="prod.name"></div>
+							<div class="text-xs text-[#8E8E93] font-mono" x-text="'SKU/Barcode: ' + prod.sku"></div>
+						</div>
+						<div class="text-right">
+							<span class="inline-block px-2.5 py-1 rounded-md text-xs font-semibold tabular-nums bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5EA]" x-text="'Stok: ' + prod.current_stock"></span>
+						</div>
+					</button>
+				</template>
+				<div
+					x-show="filteredProducts().length === 0"
+					class="px-4 py-4 text-sm text-[#8E8E93] text-center"
+				>
+					Barang dengan kata kunci / barcode tersebut tidak ditemukan.
+				</div>
+			</div>
+		</div>
+
+		<div class="overflow-x-auto border border-[#E5E5EA] rounded-2xl">
+			<table class="w-full text-left border-collapse">
+				<thead class="bg-[#F5F5F7]/70 border-b border-[#E5E5EA] text-sm font-medium text-[#8E8E93]">
+					<tr>
+						<th class="py-3.5 px-4">Barang</th>
+						<th class="py-3.5 px-4 w-48">Satuan Beli</th>
+						<th class="py-3.5 px-4 w-32 text-right">Qty</th>
+						<th class="py-3.5 px-4 w-44 text-right">Harga Beli / Satuan</th>
+						<th class="py-3.5 px-4 w-40 text-right">Subtotal</th>
+						<th class="py-3.5 px-4 w-14 text-center"></th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+					<template x-for="(row, idx) in rows" :key="row.key">
+						<tr>
+							<td class="py-3 px-4">
+								<input type="hidden" name="product_ids[]" :value="row.product_id"/>
+								<div class="font-semibold text-[#1D1D1F]" x-text="row.product_name"></div>
+								<div class="text-xs text-[#8E8E93] font-mono" x-text="row.sku"></div>
+							</td>
+							<td class="py-3 px-4">
+								<select
+									name="unit_ids[]"
+									x-model="row.unit_id"
+									@change="onUnitChange(row)"
+									class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+								>
+									<template x-for="u in getUnits(row.product_id)" :key="u.id">
+										<option :value="u.id" x-text="u.unit_name + (u.conversion_qty > 1 ? ' (Isi ' + u.conversion_qty + ')' : '')"></option>
+									</template>
+								</select>
+								<input type="hidden" name="unit_names[]" :value="row.unit_name"/>
+								<input type="hidden" name="conversion_qtys[]" :value="row.conversion_qty"/>
+							</td>
+							<td class="py-3 px-4">
+								<input
+									type="number"
+									name="qtys[]"
+									x-model.number="row.qty"
+									min="1"
+									required
+									class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] text-sm text-right tabular-nums font-semibold focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+								/>
+							</td>
+							<td class="py-3 px-4">
+								<input
+									type="number"
+									name="costs[]"
+									x-model.number="row.cost"
+									min="0"
+									step="any"
+									required
+									class="w-full bg-white border border-[#E5E5EA] rounded-xl px-3 min-h-[44px] text-sm text-right tabular-nums font-semibold focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+								/>
+							</td>
+							<td class="py-3 px-4 text-right font-semibold text-[#1D1D1F] tabular-nums" x-text="'Rp ' + formatRupiah((row.qty || 0) * (row.cost || 0))"></td>
+							<td class="py-3 px-4 text-center">
+								<button
+									type="button"
+									@click="removeRow(idx)"
+									class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl text-[#8E8E93] hover:text-[#FF3B30] hover:bg-[#FF3B30]/10 transition"
+									title="Hapus Baris"
+								>
+									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+								</button>
+							</td>
+						</tr>
+					</template>
+					<tr x-show="rows.length === 0">
+						<td colspan="6" class="py-8 text-center text-[#8E8E93] text-sm">
+							Belum ada barang dipilih. Ketik nama barang atau scan barcode pada kotak di atas untuk menambahkan.
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+}
+
+templ PurchaseSummaryAndItemsTable(purchase repo.GetPurchaseByIDRow, items []repo.GetPurchaseDetailsRow) {
+	<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 py-5 border-b border-[#E5E5EA] text-sm">
+		<div>
+			<span class="text-[#8E8E93] block">Supplier</span>
+			<span class="font-semibold text-[#1D1D1F]">{ purchase.SupplierName }</span>
+			if purchase.SupplierPhone != "" {
+				<span class="text-xs text-[#8E8E93] block mt-0.5">Telp: { purchase.SupplierPhone }</span>
+			}
+		</div>
+		<div>
+			<span class="text-[#8E8E93] block">Metode Pembayaran</span>
+			<span class="font-semibold uppercase text-[#1D1D1F]">{ purchase.PaymentMethod }</span>
+		</div>
+		<div>
+			<span class="text-[#8E8E93] block">Catatan</span>
+			<span class="text-[#1D1D1F]">
+				if purchase.Notes != "" {
+					{ purchase.Notes }
+				} else {
+					-
+				}
+			</span>
+		</div>
+	</div>
+
+	<div class="py-6">
+		<h3 class="text-base font-bold text-[#1D1D1F] mb-4">Rincian Barang</h3>
+		<div class="overflow-x-auto border border-[#E5E5EA] rounded-2xl">
+			<table class="w-full text-left border-collapse">
+				<thead class="bg-[#F5F5F7]/70 border-b border-[#E5E5EA] text-sm font-medium text-[#8E8E93]">
+					<tr>
+						<th class="py-3.5 px-4">SKU</th>
+						<th class="py-3.5 px-4">Nama Barang</th>
+						<th class="py-3.5 px-4">Satuan Beli</th>
+						<th class="py-3.5 px-4 text-right">Qty</th>
+						<th class="py-3.5 px-4 text-right">Harga Beli</th>
+						<th class="py-3.5 px-4 text-right">Subtotal</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+					for _, item := range items {
+						<tr>
+							<td class="py-3.5 px-4 font-mono text-gray-600">{ item.Sku }</td>
+							<td class="py-3.5 px-4 font-medium text-[#1D1D1F]">{ item.ProductName }</td>
+							<td class="py-3.5 px-4">
+								<span class="px-2.5 py-0.5 rounded-md bg-[#F5F5F7] text-[#1D1D1F] font-medium border border-[#E5E5EA]">{ item.UnitName }</span>
+								if item.ConversionQty > 1 {
+									<span class="text-xs text-[#8E8E93] ml-1 tabular-nums">(Isi { fmt.Sprint(item.ConversionQty) })</span>
+								}
+							</td>
+							<td class="py-3.5 px-4 text-right font-semibold text-[#1D1D1F] tabular-nums">{ fmt.Sprint(item.Qty) }</td>
+							<td class="py-3.5 px-4 text-right text-gray-700 tabular-nums">Rp { utils.FormatRupiah(item.Cost) }</td>
+							<td class="py-3.5 px-4 text-right font-semibold text-[#1D1D1F] tabular-nums">Rp { utils.FormatRupiah(item.Subtotal) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+	<div class="flex justify-end pt-2">
+		<div class="bg-[#F5F5F7] px-6 py-4 rounded-2xl border border-[#E5E5EA] text-right">
+			<span class="text-sm text-[#8E8E93] block">Total Nilai</span>
+			<span class="text-2xl font-bold text-[#1D1D1F] tabular-nums">Rp { utils.FormatRupiah(purchase.TotalCost) }</span>
+		</div>
+	</div>
+}
+
+templ PurchaseCatalogScript() {
+	<script>
+		function purchaseFormState(catalog) {
+			return {
+				catalog: catalog || [],
+				searchQuery: '',
+				showDropdown: false,
+				rows: [],
+				filteredProducts() {
+					const q = this.searchQuery.trim().toLowerCase();
+					if (!q) return [];
+					return this.catalog.filter(p =>
+						p.name.toLowerCase().includes(q) ||
+						p.sku.toLowerCase().includes(q)
+					).slice(0, 8);
+				},
+				handleEnterSearch() {
+					const q = this.searchQuery.trim().toLowerCase();
+					if (!q) return;
+					const exact = this.catalog.find(p => p.sku.toLowerCase() === q);
+					if (exact) {
+						this.selectProduct(exact);
+						return;
+					}
+					const list = this.filteredProducts();
+					if (list.length > 0) {
+						this.selectProduct(list[0]);
+					}
+				},
+				selectProduct(prod) {
+					const existing = this.rows.find(r => Number(r.product_id) === Number(prod.id));
+					if (existing) {
+						existing.qty = (Number(existing.qty) || 0) + 1;
+						this.searchQuery = '';
+						this.showDropdown = false;
+						return;
+					}
+
+					const units = prod.units || [];
+					const firstUnit = units.length > 0 ? units[0] : { id: 0, unit_name: 'Pcs', conversion_qty: 1, last_cost: 0 };
+
+					this.rows.push({
+						key: Date.now() + Math.random(),
+						product_id: prod.id,
+						product_name: prod.name,
+						sku: prod.sku,
+						unit_id: firstUnit.id,
+						unit_name: firstUnit.unit_name,
+						conversion_qty: firstUnit.conversion_qty,
+						qty: 1,
+						cost: Math.round(firstUnit.last_cost || 0)
+					});
+
+					this.searchQuery = '';
+					this.showDropdown = false;
+				},
+				removeRow(idx) {
+					this.rows.splice(idx, 1);
+				},
+				getUnits(productId) {
+					const p = this.catalog.find(x => Number(x.id) === Number(productId));
+					return p ? p.units : [];
+				},
+				onUnitChange(row) {
+					const units = this.getUnits(row.product_id);
+					const u = units.find(x => Number(x.id) === Number(row.unit_id));
+					if (u) {
+						row.unit_name = u.unit_name;
+						row.conversion_qty = u.conversion_qty;
+						row.cost = Math.round(u.last_cost || 0);
+					}
+				},
+				grandTotal() {
+					return this.rows.reduce((acc, r) => acc + ((Number(r.qty) || 0) * (Number(r.cost) || 0)), 0);
+				},
+				formatRupiah(val) {
+					return Math.round(val || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+				}
+			}
+		}
+	</script>
+}
+
+templ PurchaseOrderPrintView(po repo.GetPurchaseByIDRow, items []repo.GetPurchaseDetailsRow, company repo.GetCompanyConfigRow) {
+	<!DOCTYPE html>
+	<html lang="id">
+		<head>
+			<meta charset="UTF-8"/>
+			<title>{ "Purchase Order " + po.InvoiceNumber }</title>
+			<style>
+				@page {
+					size: A4;
+					margin: 15mm;
+				}
+				body {
+					font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+					font-size: 13px;
+					line-height: 1.5;
+					color: #1D1D1F;
+					margin: 0;
+					padding: 20px;
+					background: #fff;
+				}
+				.no-print {
+					margin-bottom: 20px;
+					display: flex;
+					justify-content: flex-end;
+					gap: 10px;
+				}
+				.btn-print {
+					padding: 8px 16px;
+					background: #007AFF;
+					color: #fff;
+					border: none;
+					border-radius: 8px;
+					font-weight: 600;
+					cursor: pointer;
+					font-size: 13px;
+				}
+				.btn-close {
+					padding: 8px 16px;
+					background: #E5E5EA;
+					color: #1D1D1F;
+					border: none;
+					border-radius: 8px;
+					font-weight: 600;
+					cursor: pointer;
+					font-size: 13px;
+				}
+				@media print {
+					.no-print { display: none !important; }
+					body { padding: 0; }
+				}
+				.header-table, .meta-table, .items-table, .sign-table {
+					width: 100%;
+					border-collapse: collapse;
+				}
+				.items-table th, .items-table td {
+					border: 1px solid #D1D1D6;
+					padding: 8px 10px;
+				}
+				.items-table th {
+					background-color: #F5F5F7;
+					font-weight: 600;
+					text-align: left;
+				}
+				.text-center { text-align: center; }
+				.text-right { text-align: right; }
+				.bold { font-weight: bold; }
+				.box {
+					border: 1px solid #D1D1D6;
+					border-radius: 8px;
+					padding: 12px;
+					background-color: #FAFAFA;
+				}
+			</style>
+		</head>
+		<body>
+			<div class="no-print">
+				<button class="btn-close" onclick="window.close()">Tutup</button>
+				<button class="btn-print" onclick="window.print()">Cetak / Simpan PDF (Ctrl+P)</button>
+			</div>
+
+			<table class="header-table" style="margin-bottom: 20px; border-bottom: 2px solid #1D1D1F; padding-bottom: 12px;">
+				<tr>
+					<td style="vertical-align: top; width: 60%;">
+						<div class="bold" style="font-size: 20px; text-transform: uppercase; color: #1D1D1F;">{ company.Name }</div>
+						if company.Tagline != "" {
+							<div style="color: #666; font-size: 12px;">{ company.Tagline }</div>
+						}
+						if company.Address != "" {
+							<div style="font-size: 12px; color: #444; margin-top: 4px;">{ company.Address }</div>
+						}
+						if company.Phone != "" {
+							<div style="font-size: 12px; color: #444;">Telp: { company.Phone }</div>
+						}
+					</td>
+					<td style="vertical-align: top; text-align: right; width: 40%;">
+						<div class="bold" style="font-size: 18px; color: #007AFF;">SURAT PESANAN PEMBELIAN</div>
+						<div class="bold" style="font-size: 13px; color: #8E8E93;">PURCHASE ORDER (PO)</div>
+						<div style="margin-top: 8px; font-family: monospace; font-size: 15px; font-weight: bold;">{ po.InvoiceNumber }</div>
+						<div style="font-size: 12px; color: #666;">Tanggal: { po.Date.Time.Local().Format("02/01/2006") }</div>
+					</td>
+				</tr>
+			</table>
+
+			<table class="meta-table" style="margin-bottom: 20px;">
+				<tr>
+					<td style="vertical-align: top; width: 50%; padding-right: 15px;">
+						<div class="box">
+							<div class="bold" style="font-size: 11px; text-transform: uppercase; color: #8E8E93; margin-bottom: 6px;">Kepada Vendor / Supplier:</div>
+							<div class="bold" style="font-size: 14px;">{ po.SupplierName }</div>
+							if po.SupplierPhone != "" {
+								<div style="font-size: 12px; color: #444; margin-top: 2px;">Telp / WA: { po.SupplierPhone }</div>
+							}
+							if po.SupplierAddress != "" {
+								<div style="font-size: 12px; color: #444; margin-top: 2px;">Alamat: { po.SupplierAddress }</div>
+							}
+						</div>
+					</td>
+					<td style="vertical-align: top; width: 50%; padding-left: 15px;">
+						<div class="box">
+							<div class="bold" style="font-size: 11px; text-transform: uppercase; color: #8E8E93; margin-bottom: 6px;">Informasi Dokumen:</div>
+							<div style="font-size: 12px;"><strong>Metode Pembayaran:</strong> <span style="text-transform: uppercase;">{ po.PaymentMethod }</span></div>
+							<div style="font-size: 12px; margin-top: 2px;"><strong>Status PO:</strong> <span style="text-transform: uppercase;">{ po.Status }</span></div>
+							if po.Notes != "" {
+								<div style="font-size: 12px; margin-top: 2px;"><strong>Catatan:</strong> { po.Notes }</div>
+							}
+						</div>
+					</td>
+				</tr>
+			</table>
+
+			<table class="items-table" style="margin-bottom: 15px;">
+				<thead>
+					<tr>
+						<th style="width: 40px;" class="text-center">No</th>
+						<th style="width: 140px;">SKU</th>
+						<th>Nama Barang</th>
+						<th class="text-center" style="width: 110px;">Satuan</th>
+						<th class="text-right" style="width: 110px;">Jumlah Dipesan</th>
+					</tr>
+				</thead>
+				<tbody>
+					for i, d := range items {
+						<tr>
+							<td class="text-center">{ fmt.Sprintf("%d", i+1) }</td>
+							<td style="font-family: monospace; font-size: 12px;">{ d.Sku }</td>
+							<td class="bold">{ d.ProductName }</td>
+							<td class="text-center">{ d.UnitName }</td>
+							<td class="text-right bold" style="font-size: 14px;">{ fmt.Sprintf("%d", d.Qty) }</td>
+						</tr>
+					}
+				</tbody>
+				<tfoot>
+					<tr style="background-color: #F5F5F7;">
+						<td colspan="4" class="text-right bold" style="font-size: 13px;">TOTAL JENIS BARANG DIPESAN:</td>
+						<td class="text-right bold" style="font-size: 14px; color: #007AFF;">
+							{ fmt.Sprintf("%d Item", len(items)) }
+						</td>
+					</tr>
+				</tfoot>
+			</table>
+
+			<div style="font-size: 11px; color: #555; margin-bottom: 30px;">
+				<em>* Harap lakukan konfirmasi ketersediaan dan jadwal pengiriman barang setelah menerima Surat Pesanan ini.</em>
+			</div>
+
+			<table class="sign-table" style="margin-top: 40px; page-break-inside: avoid;">
+				<tr>
+					<td style="width: 50%; text-align: center; vertical-align: top;">
+						<div style="font-size: 12px; margin-bottom: 60px;">Dipesan Oleh (Toko / Pembeli):</div>
+						<div style="border-top: 1px solid #1D1D1F; width: 200px; margin: 0 auto; padding-top: 4px; font-weight: bold;">
+							{ company.Name }
+						</div>
+					</td>
+					<td style="width: 50%; text-align: center; vertical-align: top;">
+						<div style="font-size: 12px; margin-bottom: 60px;">Dikonfirmasi Oleh Vendor / Supplier:</div>
+						<div style="border-top: 1px solid #1D1D1F; width: 200px; margin: 0 auto; padding-top: 4px; font-weight: bold;">
+							{ po.SupplierName }
+						</div>
+					</td>
+				</tr>
+			</table>
+		</body>
+	</html>
+}
+

@@ -7,7 +7,193 @@ package repo
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const backfillZeroCogsByProductID = `-- name: BackfillZeroCogsByProductID :exec
+UPDATE sale_details
+SET cogs = ($2::numeric * GREATEST(conversion_qty, 1))::numeric(15,2)
+WHERE product_id = $1 AND cogs = 0
+`
+
+type BackfillZeroCogsByProductIDParams struct {
+	ProductID int32          `json:"product_id"`
+	Column2   pgtype.Numeric `json:"column_2"`
+}
+
+func (q *Queries) BackfillZeroCogsByProductID(ctx context.Context, arg BackfillZeroCogsByProductIDParams) error {
+	_, err := q.db.Exec(ctx, backfillZeroCogsByProductID, arg.ProductID, arg.Column2)
+	return err
+}
+
+const cancelPendingBackordersByPrefix = `-- name: CancelPendingBackordersByPrefix :exec
+UPDATE purchases
+SET status = 'batal', updated_at = CURRENT_TIMESTAMP
+WHERE invoice_number LIKE $1 AND status = 'pending'
+`
+
+func (q *Queries) CancelPendingBackordersByPrefix(ctx context.Context, invoiceNumber string) error {
+	_, err := q.db.Exec(ctx, cancelPendingBackordersByPrefix, invoiceNumber)
+	return err
+}
+
+const cancelPurchaseOrder = `-- name: CancelPurchaseOrder :exec
+UPDATE purchases
+SET status = 'batal', updated_at = CURRENT_TIMESTAMP
+WHERE id = $1 AND status = 'pending'
+`
+
+func (q *Queries) CancelPurchaseOrder(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, cancelPurchaseOrder, id)
+	return err
+}
+
+const countDebtInvoices = `-- name: CountDebtInvoices :one
+SELECT COUNT(*)
+FROM sales s
+LEFT JOIN customers c ON s.customer_id = c.id
+WHERE s.status != 'batal'
+  AND ($1::text = '' OR s.invoice_no ILIKE $1 OR c.name ILIKE $1 OR c.phone ILIKE $1)
+  AND (
+      ($2::text = 'kasbon' AND s.payment_status = 'kasbon') OR
+      ($2::text = 'lunas' AND s.payment_status = 'lunas') OR
+      ($2::text = 'overdue' AND s.payment_status = 'kasbon' AND s.due_date IS NOT NULL AND s.due_date < CURRENT_DATE) OR
+      ($2::text = '' OR $2::text = 'all')
+  )
+`
+
+type CountDebtInvoicesParams struct {
+	Column1 string `json:"column_1"`
+	Column2 string `json:"column_2"`
+}
+
+func (q *Queries) CountDebtInvoices(ctx context.Context, arg CountDebtInvoicesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countDebtInvoices, arg.Column1, arg.Column2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countLowStockProducts = `-- name: CountLowStockProducts :one
+SELECT COUNT(*)
+FROM products
+WHERE is_active = true
+  AND type = 'barang'
+  AND current_stock <= min_stock
+`
+
+func (q *Queries) CountLowStockProducts(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countLowStockProducts)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countProducts = `-- name: CountProducts :one
+SELECT COUNT(*) 
+FROM products p
+WHERE p.is_active = true
+  AND (p.name ILIKE $1 OR p.sku ILIKE $1)
+  AND ($2::int = 0 OR p.category_id = $2::int)
+  AND ($3::text = '' OR p.type = $3::text)
+  AND (
+    $4::text = '' OR
+    ($4::text = 'low_stock' AND p.type = 'barang' AND p.current_stock <= p.min_stock) OR
+    ($4::text = 'out_of_stock' AND p.type = 'barang' AND p.current_stock <= 0) OR
+    ($4::text = 'in_stock' AND (p.type != 'barang' OR p.current_stock > p.min_stock)) OR
+    ($4::text = 'no_hpp' AND p.type = 'barang' AND COALESCE(p.average_cost, 0) <= 0)
+  )
+`
+
+type CountProductsParams struct {
+	Name    string `json:"name"`
+	Column2 int32  `json:"column_2"`
+	Column3 string `json:"column_3"`
+	Column4 string `json:"column_4"`
+}
+
+func (q *Queries) CountProducts(ctx context.Context, arg CountProductsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countProducts,
+		arg.Name,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countSalesDetailReport = `-- name: CountSalesDetailReport :one
+SELECT COUNT(*)
+FROM sale_details sd
+JOIN sales s ON sd.sale_id = s.id
+JOIN products p ON sd.product_id = p.id
+WHERE s.status != 'batal'
+  AND s.date >= $1::timestamptz AND s.date <= $2::timestamptz
+  AND ($3::text = '' OR p.name ILIKE $3 OR p.sku ILIKE $3 OR s.invoice_no ILIKE $3)
+  AND ($4::int = 0 OR p.category_id = $4)
+`
+
+type CountSalesDetailReportParams struct {
+	Column1 pgtype.Timestamptz `json:"column_1"`
+	Column2 pgtype.Timestamptz `json:"column_2"`
+	Column3 string             `json:"column_3"`
+	Column4 int32              `json:"column_4"`
+}
+
+func (q *Queries) CountSalesDetailReport(ctx context.Context, arg CountSalesDetailReportParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSalesDetailReport,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countStockAdjustments = `-- name: CountStockAdjustments :one
+SELECT COUNT(*)
+FROM stock_adjustments sa
+JOIN products p ON sa.product_id = p.id
+WHERE ($1::text = '' OR p.name ILIKE $1 OR p.sku ILIKE $1 OR sa.adjustment_no ILIKE $1)
+  AND ($2::text = '' OR sa.reason = $2::text)
+  AND ($3::timestamptz IS NULL OR sa.date >= $3::timestamptz)
+  AND ($4::timestamptz IS NULL OR sa.date <= $4::timestamptz)
+`
+
+type CountStockAdjustmentsParams struct {
+	Column1 string             `json:"column_1"`
+	Column2 string             `json:"column_2"`
+	Column3 pgtype.Timestamptz `json:"column_3"`
+	Column4 pgtype.Timestamptz `json:"column_4"`
+}
+
+func (q *Queries) CountStockAdjustments(ctx context.Context, arg CountStockAdjustmentsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countStockAdjustments,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countUsers = `-- name: CountUsers :one
+SELECT COUNT(*) FROM users
+`
+
+func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countUsers)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
 
 const createCategory = `-- name: CreateCategory :one
 INSERT INTO categories (
@@ -36,6 +222,394 @@ func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) 
 	return i, err
 }
 
+const createCustomer = `-- name: CreateCustomer :one
+INSERT INTO customers (
+	name, phone, address
+) VALUES (
+	$1, $2, $3
+) RETURNING id, name, phone, address, is_active, created_at, updated_at
+`
+
+type CreateCustomerParams struct {
+	Name    string      `json:"name"`
+	Phone   pgtype.Text `json:"phone"`
+	Address pgtype.Text `json:"address"`
+}
+
+func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error) {
+	row := q.db.QueryRow(ctx, createCustomer, arg.Name, arg.Phone, arg.Address)
+	var i Customer
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Phone,
+		&i.Address,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createInventoryLedger = `-- name: CreateInventoryLedger :exec
+INSERT INTO inventory_ledgers (
+	product_id, transaction_type, reference_id, qty_change, balance_after, notes
+) VALUES (
+	$1, $2, $3, $4, $5, $6
+)
+`
+
+type CreateInventoryLedgerParams struct {
+	ProductID       int32       `json:"product_id"`
+	TransactionType string      `json:"transaction_type"`
+	ReferenceID     pgtype.Int4 `json:"reference_id"`
+	QtyChange       int32       `json:"qty_change"`
+	BalanceAfter    int32       `json:"balance_after"`
+	Notes           string      `json:"notes"`
+}
+
+func (q *Queries) CreateInventoryLedger(ctx context.Context, arg CreateInventoryLedgerParams) error {
+	_, err := q.db.Exec(ctx, createInventoryLedger,
+		arg.ProductID,
+		arg.TransactionType,
+		arg.ReferenceID,
+		arg.QtyChange,
+		arg.BalanceAfter,
+		arg.Notes,
+	)
+	return err
+}
+
+const createProduct = `-- name: CreateProduct :one
+INSERT INTO products (
+category_id, sku, name, type, is_open_price, current_stock, average_cost, min_stock
+) VALUES (
+	$1, $2, $3, $4, $5, $6, $7, $8
+) RETURNING id
+`
+
+type CreateProductParams struct {
+	CategoryID   int32          `json:"category_id"`
+	Sku          string         `json:"sku"`
+	Name         string         `json:"name"`
+	Type         string         `json:"type"`
+	IsOpenPrice  bool           `json:"is_open_price"`
+	CurrentStock int32          `json:"current_stock"`
+	AverageCost  pgtype.Numeric `json:"average_cost"`
+	MinStock     int32          `json:"min_stock"`
+}
+
+func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (int32, error) {
+	row := q.db.QueryRow(ctx, createProduct,
+		arg.CategoryID,
+		arg.Sku,
+		arg.Name,
+		arg.Type,
+		arg.IsOpenPrice,
+		arg.CurrentStock,
+		arg.AverageCost,
+		arg.MinStock,
+	)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
+const createProductUnit = `-- name: CreateProductUnit :exec
+INSERT INTO product_units (
+	product_id, unit_name, conversion_qty, price
+) VALUES (
+	$1, $2, $3, $4
+)
+`
+
+type CreateProductUnitParams struct {
+	ProductID     int32          `json:"product_id"`
+	UnitName      string         `json:"unit_name"`
+	ConversionQty int32          `json:"conversion_qty"`
+	Price         pgtype.Numeric `json:"price"`
+}
+
+func (q *Queries) CreateProductUnit(ctx context.Context, arg CreateProductUnitParams) error {
+	_, err := q.db.Exec(ctx, createProductUnit,
+		arg.ProductID,
+		arg.UnitName,
+		arg.ConversionQty,
+		arg.Price,
+	)
+	return err
+}
+
+const createPurchase = `-- name: CreatePurchase :one
+INSERT INTO purchases (
+	invoice_number, supplier_id, payment_method, total_cost, status, notes, received_at
+) VALUES (
+	$1, $2, $3, $4, $5, $6, $7
+) RETURNING id
+`
+
+type CreatePurchaseParams struct {
+	InvoiceNumber string             `json:"invoice_number"`
+	SupplierID    pgtype.Int4        `json:"supplier_id"`
+	PaymentMethod string             `json:"payment_method"`
+	TotalCost     pgtype.Numeric     `json:"total_cost"`
+	Status        string             `json:"status"`
+	Notes         string             `json:"notes"`
+	ReceivedAt    pgtype.Timestamptz `json:"received_at"`
+}
+
+func (q *Queries) CreatePurchase(ctx context.Context, arg CreatePurchaseParams) (int32, error) {
+	row := q.db.QueryRow(ctx, createPurchase,
+		arg.InvoiceNumber,
+		arg.SupplierID,
+		arg.PaymentMethod,
+		arg.TotalCost,
+		arg.Status,
+		arg.Notes,
+		arg.ReceivedAt,
+	)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
+const createPurchaseDetail = `-- name: CreatePurchaseDetail :exec
+INSERT INTO purchase_details (
+	purchase_id, product_id, unit_id, unit_name, conversion_qty, qty, cost, subtotal
+) VALUES (
+	$1, $2, $3, $4, $5, $6, $7, $8
+)
+`
+
+type CreatePurchaseDetailParams struct {
+	PurchaseID    int32          `json:"purchase_id"`
+	ProductID     int32          `json:"product_id"`
+	UnitID        pgtype.Int4    `json:"unit_id"`
+	UnitName      string         `json:"unit_name"`
+	ConversionQty int32          `json:"conversion_qty"`
+	Qty           int32          `json:"qty"`
+	Cost          pgtype.Numeric `json:"cost"`
+	Subtotal      pgtype.Numeric `json:"subtotal"`
+}
+
+func (q *Queries) CreatePurchaseDetail(ctx context.Context, arg CreatePurchaseDetailParams) error {
+	_, err := q.db.Exec(ctx, createPurchaseDetail,
+		arg.PurchaseID,
+		arg.ProductID,
+		arg.UnitID,
+		arg.UnitName,
+		arg.ConversionQty,
+		arg.Qty,
+		arg.Cost,
+		arg.Subtotal,
+	)
+	return err
+}
+
+const createSale = `-- name: CreateSale :one
+INSERT INTO sales (
+	invoice_no, customer_id, date, total_amount, discount_amount, paid_amount, change_amount, payment_method, payment_status, due_date, status, notes
+) VALUES (
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+) RETURNING id
+`
+
+type CreateSaleParams struct {
+	InvoiceNo      string             `json:"invoice_no"`
+	CustomerID     pgtype.Int4        `json:"customer_id"`
+	Date           pgtype.Timestamptz `json:"date"`
+	TotalAmount    pgtype.Numeric     `json:"total_amount"`
+	DiscountAmount pgtype.Numeric     `json:"discount_amount"`
+	PaidAmount     pgtype.Numeric     `json:"paid_amount"`
+	ChangeAmount   pgtype.Numeric     `json:"change_amount"`
+	PaymentMethod  string             `json:"payment_method"`
+	PaymentStatus  string             `json:"payment_status"`
+	DueDate        pgtype.Date        `json:"due_date"`
+	Status         string             `json:"status"`
+	Notes          string             `json:"notes"`
+}
+
+func (q *Queries) CreateSale(ctx context.Context, arg CreateSaleParams) (int32, error) {
+	row := q.db.QueryRow(ctx, createSale,
+		arg.InvoiceNo,
+		arg.CustomerID,
+		arg.Date,
+		arg.TotalAmount,
+		arg.DiscountAmount,
+		arg.PaidAmount,
+		arg.ChangeAmount,
+		arg.PaymentMethod,
+		arg.PaymentStatus,
+		arg.DueDate,
+		arg.Status,
+		arg.Notes,
+	)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
+const createSaleDetail = `-- name: CreateSaleDetail :exec
+INSERT INTO sale_details (
+	sale_id, product_id, unit_id, unit_name, conversion_qty, qty, price, discount, subtotal, cogs, is_open_price
+) VALUES (
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+)
+`
+
+type CreateSaleDetailParams struct {
+	SaleID        int32          `json:"sale_id"`
+	ProductID     int32          `json:"product_id"`
+	UnitID        pgtype.Int4    `json:"unit_id"`
+	UnitName      string         `json:"unit_name"`
+	ConversionQty int32          `json:"conversion_qty"`
+	Qty           int32          `json:"qty"`
+	Price         pgtype.Numeric `json:"price"`
+	Discount      pgtype.Numeric `json:"discount"`
+	Subtotal      pgtype.Numeric `json:"subtotal"`
+	Cogs          pgtype.Numeric `json:"cogs"`
+	IsOpenPrice   bool           `json:"is_open_price"`
+}
+
+func (q *Queries) CreateSaleDetail(ctx context.Context, arg CreateSaleDetailParams) error {
+	_, err := q.db.Exec(ctx, createSaleDetail,
+		arg.SaleID,
+		arg.ProductID,
+		arg.UnitID,
+		arg.UnitName,
+		arg.ConversionQty,
+		arg.Qty,
+		arg.Price,
+		arg.Discount,
+		arg.Subtotal,
+		arg.Cogs,
+		arg.IsOpenPrice,
+	)
+	return err
+}
+
+const createStockAdjustment = `-- name: CreateStockAdjustment :one
+INSERT INTO stock_adjustments (
+    adjustment_no, product_id, system_stock, physical_stock, difference_qty, reason, notes
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7
+) RETURNING id, adjustment_no, date, product_id, system_stock, physical_stock, difference_qty, reason, notes, created_at
+`
+
+type CreateStockAdjustmentParams struct {
+	AdjustmentNo  string `json:"adjustment_no"`
+	ProductID     int32  `json:"product_id"`
+	SystemStock   int32  `json:"system_stock"`
+	PhysicalStock int32  `json:"physical_stock"`
+	DifferenceQty int32  `json:"difference_qty"`
+	Reason        string `json:"reason"`
+	Notes         string `json:"notes"`
+}
+
+func (q *Queries) CreateStockAdjustment(ctx context.Context, arg CreateStockAdjustmentParams) (StockAdjustment, error) {
+	row := q.db.QueryRow(ctx, createStockAdjustment,
+		arg.AdjustmentNo,
+		arg.ProductID,
+		arg.SystemStock,
+		arg.PhysicalStock,
+		arg.DifferenceQty,
+		arg.Reason,
+		arg.Notes,
+	)
+	var i StockAdjustment
+	err := row.Scan(
+		&i.ID,
+		&i.AdjustmentNo,
+		&i.Date,
+		&i.ProductID,
+		&i.SystemStock,
+		&i.PhysicalStock,
+		&i.DifferenceQty,
+		&i.Reason,
+		&i.Notes,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createSupplier = `-- name: CreateSupplier :one
+INSERT INTO suppliers (
+	name, phone, address
+) VALUES (
+	$1, $2, $3
+) RETURNING id, name, phone, address, is_active, created_at, updated_at
+`
+
+type CreateSupplierParams struct {
+	Name    string      `json:"name"`
+	Phone   pgtype.Text `json:"phone"`
+	Address pgtype.Text `json:"address"`
+}
+
+func (q *Queries) CreateSupplier(ctx context.Context, arg CreateSupplierParams) (Supplier, error) {
+	row := q.db.QueryRow(ctx, createSupplier, arg.Name, arg.Phone, arg.Address)
+	var i Supplier
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Phone,
+		&i.Address,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (
+    username, name, password_hash, role, is_active
+) VALUES (
+    $1, $2, $3, $4, $5
+) RETURNING id, username, name, password_hash, role, is_active, created_at, updated_at
+`
+
+type CreateUserParams struct {
+	Username     string `json:"username"`
+	Name         string `json:"name"`
+	PasswordHash string `json:"password_hash"`
+	Role         string `json:"role"`
+	IsActive     bool   `json:"is_active"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, createUser,
+		arg.Username,
+		arg.Name,
+		arg.PasswordHash,
+		arg.Role,
+		arg.IsActive,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Name,
+		&i.PasswordHash,
+		&i.Role,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deactivateProductUnitsByProductID = `-- name: DeactivateProductUnitsByProductID :exec
+UPDATE product_units
+SET is_active = false, updated_at = CURRENT_TIMESTAMP
+WHERE product_id = $1
+`
+
+func (q *Queries) DeactivateProductUnitsByProductID(ctx context.Context, productID int32) error {
+	_, err := q.db.Exec(ctx, deactivateProductUnitsByProductID, productID)
+	return err
+}
+
 const deleteCategory = `-- name: DeleteCategory :exec
 UPDATE categories
 SET is_active = false, updated_at = CURRENT_TIMESTAMP
@@ -44,6 +618,49 @@ WHERE id = $1
 
 func (q *Queries) DeleteCategory(ctx context.Context, id int32) error {
 	_, err := q.db.Exec(ctx, deleteCategory, id)
+	return err
+}
+
+const deleteCustomer = `-- name: DeleteCustomer :exec
+UPDATE customers
+SET is_active = false, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+func (q *Queries) DeleteCustomer(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, deleteCustomer, id)
+	return err
+}
+
+const deleteProduct = `-- name: DeleteProduct :exec
+UPDATE products
+SET is_active = false, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+func (q *Queries) DeleteProduct(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, deleteProduct, id)
+	return err
+}
+
+const deletePurchaseDetailByID = `-- name: DeletePurchaseDetailByID :exec
+DELETE FROM purchase_details
+WHERE id = $1
+`
+
+func (q *Queries) DeletePurchaseDetailByID(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, deletePurchaseDetailByID, id)
+	return err
+}
+
+const deleteSupplier = `-- name: DeleteSupplier :exec
+UPDATE suppliers
+SET is_active = false, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+func (q *Queries) DeleteSupplier(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, deleteSupplier, id)
 	return err
 }
 
@@ -64,6 +681,1548 @@ func (q *Queries) GetCategoryByID(ctx context.Context, id int32) (Category, erro
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getCompanyConfig = `-- name: GetCompanyConfig :one
+SELECT id, name, tagline, phone, address, receipt_footer, updated_at
+FROM company_configs
+WHERE id = 1
+LIMIT 1
+`
+
+type GetCompanyConfigRow struct {
+	ID            int32              `json:"id"`
+	Name          string             `json:"name"`
+	Tagline       string             `json:"tagline"`
+	Phone         string             `json:"phone"`
+	Address       string             `json:"address"`
+	ReceiptFooter string             `json:"receipt_footer"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetCompanyConfig(ctx context.Context) (GetCompanyConfigRow, error) {
+	row := q.db.QueryRow(ctx, getCompanyConfig)
+	var i GetCompanyConfigRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Tagline,
+		&i.Phone,
+		&i.Address,
+		&i.ReceiptFooter,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getCustomerByID = `-- name: GetCustomerByID :one
+SELECT id, name, phone, address, is_active, created_at, updated_at FROM customers
+WHERE id = $1 AND is_active = true
+LIMIT 1
+`
+
+func (q *Queries) GetCustomerByID(ctx context.Context, id int32) (Customer, error) {
+	row := q.db.QueryRow(ctx, getCustomerByID, id)
+	var i Customer
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Phone,
+		&i.Address,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getCustomerByIDAnyStatus = `-- name: GetCustomerByIDAnyStatus :one
+SELECT id, name, phone, address, is_active, created_at, updated_at FROM customers
+WHERE id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetCustomerByIDAnyStatus(ctx context.Context, id int32) (Customer, error) {
+	row := q.db.QueryRow(ctx, getCustomerByIDAnyStatus, id)
+	var i Customer
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Phone,
+		&i.Address,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getCustomerUnpaidDebtTotal = `-- name: GetCustomerUnpaidDebtTotal :one
+SELECT COALESCE(SUM(total_amount - paid_amount), 0)::NUMERIC(15,2) AS remaining_debt
+FROM sales
+WHERE customer_id = $1 AND status != 'batal' AND payment_status = 'kasbon'
+`
+
+func (q *Queries) GetCustomerUnpaidDebtTotal(ctx context.Context, customerID pgtype.Int4) (pgtype.Numeric, error) {
+	row := q.db.QueryRow(ctx, getCustomerUnpaidDebtTotal, customerID)
+	var remaining_debt pgtype.Numeric
+	err := row.Scan(&remaining_debt)
+	return remaining_debt, err
+}
+
+const getDashboardLowStockProducts = `-- name: GetDashboardLowStockProducts :many
+SELECT 
+    p.id,
+    p.name,
+    p.sku,
+    COALESCE(c.name, 'Umum') AS category_name,
+    p.current_stock,
+    p.min_stock,
+    COALESCE(pu.unit_name, 'Pcs') AS unit_name
+FROM products p
+LEFT JOIN categories c ON p.category_id = c.id
+LEFT JOIN product_units pu ON p.id = pu.product_id AND pu.conversion_qty = 1 AND pu.is_active = true
+WHERE p.is_active = true 
+  AND p.type = 'barang' 
+  AND p.current_stock <= p.min_stock
+ORDER BY (p.current_stock - p.min_stock) ASC, p.current_stock ASC
+LIMIT 5
+`
+
+type GetDashboardLowStockProductsRow struct {
+	ID           int32  `json:"id"`
+	Name         string `json:"name"`
+	Sku          string `json:"sku"`
+	CategoryName string `json:"category_name"`
+	CurrentStock int32  `json:"current_stock"`
+	MinStock     int32  `json:"min_stock"`
+	UnitName     string `json:"unit_name"`
+}
+
+func (q *Queries) GetDashboardLowStockProducts(ctx context.Context) ([]GetDashboardLowStockProductsRow, error) {
+	rows, err := q.db.Query(ctx, getDashboardLowStockProducts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetDashboardLowStockProductsRow
+	for rows.Next() {
+		var i GetDashboardLowStockProductsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Sku,
+			&i.CategoryName,
+			&i.CurrentStock,
+			&i.MinStock,
+			&i.UnitName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getDebtsSummaryMetrics = `-- name: GetDebtsSummaryMetrics :one
+SELECT 
+    COALESCE(SUM(total_amount - paid_amount), 0)::NUMERIC(15,2) AS total_outstanding,
+    COALESCE(COUNT(DISTINCT customer_id), 0)::BIGINT AS total_customers_in_debt,
+    COALESCE(SUM(
+        CASE WHEN due_date IS NOT NULL AND due_date < CURRENT_DATE 
+             THEN (total_amount - paid_amount) 
+             ELSE 0 
+        END
+    ), 0)::NUMERIC(15,2) AS total_overdue,
+    COALESCE((
+        SELECT SUM(dp.amount_paid)
+        FROM debt_payments dp
+        WHERE EXTRACT(MONTH FROM dp.date) = EXTRACT(MONTH FROM CURRENT_DATE)
+          AND EXTRACT(YEAR FROM dp.date) = EXTRACT(YEAR FROM CURRENT_DATE)
+    ), 0)::NUMERIC(15,2) AS total_settled_this_month
+FROM sales
+WHERE status != 'batal'
+  AND payment_status = 'kasbon'
+`
+
+type GetDebtsSummaryMetricsRow struct {
+	TotalOutstanding      pgtype.Numeric `json:"total_outstanding"`
+	TotalCustomersInDebt  int64          `json:"total_customers_in_debt"`
+	TotalOverdue          pgtype.Numeric `json:"total_overdue"`
+	TotalSettledThisMonth pgtype.Numeric `json:"total_settled_this_month"`
+}
+
+func (q *Queries) GetDebtsSummaryMetrics(ctx context.Context) (GetDebtsSummaryMetricsRow, error) {
+	row := q.db.QueryRow(ctx, getDebtsSummaryMetrics)
+	var i GetDebtsSummaryMetricsRow
+	err := row.Scan(
+		&i.TotalOutstanding,
+		&i.TotalCustomersInDebt,
+		&i.TotalOverdue,
+		&i.TotalSettledThisMonth,
+	)
+	return i, err
+}
+
+const getLastProductByCategory = `-- name: GetLastProductByCategory :one
+SELECT sku FROM products 
+WHERE category_id = $1 AND sku LIKE $2 
+ORDER BY id DESC LIMIT 1
+`
+
+type GetLastProductByCategoryParams struct {
+	CategoryID int32  `json:"category_id"`
+	Sku        string `json:"sku"`
+}
+
+func (q *Queries) GetLastProductByCategory(ctx context.Context, arg GetLastProductByCategoryParams) (string, error) {
+	row := q.db.QueryRow(ctx, getLastProductByCategory, arg.CategoryID, arg.Sku)
+	var sku string
+	err := row.Scan(&sku)
+	return sku, err
+}
+
+const getLastStockAdjustmentNo = `-- name: GetLastStockAdjustmentNo :one
+SELECT adjustment_no FROM stock_adjustments
+WHERE adjustment_no LIKE $1
+ORDER BY id DESC LIMIT 1
+`
+
+func (q *Queries) GetLastStockAdjustmentNo(ctx context.Context, adjustmentNo string) (string, error) {
+	row := q.db.QueryRow(ctx, getLastStockAdjustmentNo, adjustmentNo)
+	var adjustment_no string
+	err := row.Scan(&adjustment_no)
+	return adjustment_no, err
+}
+
+const getNonMovingStockReport = `-- name: GetNonMovingStockReport :many
+SELECT 
+    p.id AS product_id,
+    p.sku AS product_sku,
+    p.name AS product_name,
+    COALESCE(c.name, 'Umum') AS category_name,
+    p.current_stock,
+    COALESCE(pu.unit_name, 'Pcs') AS unit_name,
+    p.average_cost,
+    (p.current_stock * p.average_cost)::NUMERIC(15,2) AS capital_tied_up,
+    MAX(s.date)::TIMESTAMPTZ AS last_sold_date,
+    COALESCE(
+        EXTRACT(DAY FROM CURRENT_TIMESTAMP - MAX(s.date)),
+        EXTRACT(DAY FROM CURRENT_TIMESTAMP - p.created_at)
+    )::BIGINT AS days_inactive
+FROM products p
+LEFT JOIN categories c ON p.category_id = c.id
+LEFT JOIN product_units pu ON p.id = pu.product_id AND pu.conversion_qty = 1 AND pu.is_active = true
+LEFT JOIN sale_details sd ON sd.product_id = p.id
+LEFT JOIN sales s ON sd.sale_id = s.id AND s.status != 'batal'
+WHERE p.is_active = true 
+  AND p.type = 'barang'
+  AND p.current_stock > 0
+GROUP BY p.id, p.sku, p.name, c.name, pu.unit_name, p.current_stock, p.average_cost, p.created_at
+HAVING MAX(s.date) IS NULL OR MAX(s.date) <= $1::timestamptz
+ORDER BY capital_tied_up DESC, days_inactive DESC
+`
+
+type GetNonMovingStockReportRow struct {
+	ProductID     int32              `json:"product_id"`
+	ProductSku    string             `json:"product_sku"`
+	ProductName   string             `json:"product_name"`
+	CategoryName  string             `json:"category_name"`
+	CurrentStock  int32              `json:"current_stock"`
+	UnitName      string             `json:"unit_name"`
+	AverageCost   pgtype.Numeric     `json:"average_cost"`
+	CapitalTiedUp pgtype.Numeric     `json:"capital_tied_up"`
+	LastSoldDate  pgtype.Timestamptz `json:"last_sold_date"`
+	DaysInactive  int64              `json:"days_inactive"`
+}
+
+func (q *Queries) GetNonMovingStockReport(ctx context.Context, dollar_1 pgtype.Timestamptz) ([]GetNonMovingStockReportRow, error) {
+	rows, err := q.db.Query(ctx, getNonMovingStockReport, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetNonMovingStockReportRow
+	for rows.Next() {
+		var i GetNonMovingStockReportRow
+		if err := rows.Scan(
+			&i.ProductID,
+			&i.ProductSku,
+			&i.ProductName,
+			&i.CategoryName,
+			&i.CurrentStock,
+			&i.UnitName,
+			&i.AverageCost,
+			&i.CapitalTiedUp,
+			&i.LastSoldDate,
+			&i.DaysInactive,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProductByID = `-- name: GetProductByID :one
+SELECT id, category_id, sku, name, type, is_open_price, current_stock, average_cost, is_active, created_at, updated_at, min_stock FROM products
+WHERE id = $1 AND is_active = true LIMIT 1
+`
+
+func (q *Queries) GetProductByID(ctx context.Context, id int32) (Product, error) {
+	row := q.db.QueryRow(ctx, getProductByID, id)
+	var i Product
+	err := row.Scan(
+		&i.ID,
+		&i.CategoryID,
+		&i.Sku,
+		&i.Name,
+		&i.Type,
+		&i.IsOpenPrice,
+		&i.CurrentStock,
+		&i.AverageCost,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.MinStock,
+	)
+	return i, err
+}
+
+const getProductBySKU = `-- name: GetProductBySKU :one
+SELECT id, category_id, sku, name, type, is_open_price, current_stock, average_cost, is_active, created_at, updated_at, min_stock FROM products
+WHERE sku = $1 AND is_active = true LIMIT 1
+`
+
+func (q *Queries) GetProductBySKU(ctx context.Context, sku string) (Product, error) {
+	row := q.db.QueryRow(ctx, getProductBySKU, sku)
+	var i Product
+	err := row.Scan(
+		&i.ID,
+		&i.CategoryID,
+		&i.Sku,
+		&i.Name,
+		&i.Type,
+		&i.IsOpenPrice,
+		&i.CurrentStock,
+		&i.AverageCost,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.MinStock,
+	)
+	return i, err
+}
+
+const getProductOpeningStock = `-- name: GetProductOpeningStock :one
+SELECT COALESCE(
+    (SELECT balance_after 
+     FROM inventory_ledgers 
+     WHERE product_id = $1 AND date < $2::timestamptz 
+     ORDER BY id DESC LIMIT 1),
+    0
+)::INT AS opening_stock
+`
+
+type GetProductOpeningStockParams struct {
+	ProductID int32              `json:"product_id"`
+	Column2   pgtype.Timestamptz `json:"column_2"`
+}
+
+func (q *Queries) GetProductOpeningStock(ctx context.Context, arg GetProductOpeningStockParams) (int32, error) {
+	row := q.db.QueryRow(ctx, getProductOpeningStock, arg.ProductID, arg.Column2)
+	var opening_stock int32
+	err := row.Scan(&opening_stock)
+	return opening_stock, err
+}
+
+const getProductStockLedger = `-- name: GetProductStockLedger :many
+SELECT 
+    il.id,
+    il.date,
+    il.transaction_type,
+    il.reference_id,
+    il.qty_change,
+    il.balance_after,
+    il.notes
+FROM inventory_ledgers il
+WHERE il.product_id = $1
+  AND il.date >= $2::timestamptz AND il.date <= $3::timestamptz
+ORDER BY il.id ASC
+`
+
+type GetProductStockLedgerParams struct {
+	ProductID int32              `json:"product_id"`
+	Column2   pgtype.Timestamptz `json:"column_2"`
+	Column3   pgtype.Timestamptz `json:"column_3"`
+}
+
+type GetProductStockLedgerRow struct {
+	ID              int32              `json:"id"`
+	Date            pgtype.Timestamptz `json:"date"`
+	TransactionType string             `json:"transaction_type"`
+	ReferenceID     pgtype.Int4        `json:"reference_id"`
+	QtyChange       int32              `json:"qty_change"`
+	BalanceAfter    int32              `json:"balance_after"`
+	Notes           string             `json:"notes"`
+}
+
+func (q *Queries) GetProductStockLedger(ctx context.Context, arg GetProductStockLedgerParams) ([]GetProductStockLedgerRow, error) {
+	rows, err := q.db.Query(ctx, getProductStockLedger, arg.ProductID, arg.Column2, arg.Column3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetProductStockLedgerRow
+	for rows.Next() {
+		var i GetProductStockLedgerRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Date,
+			&i.TransactionType,
+			&i.ReferenceID,
+			&i.QtyChange,
+			&i.BalanceAfter,
+			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProductUnits = `-- name: GetProductUnits :many
+SELECT id, product_id, unit_name, conversion_qty, price, is_active, created_at, updated_at FROM product_units
+WHERE product_id = $1 AND is_active = true
+ORDER BY conversion_qty DESC
+`
+
+func (q *Queries) GetProductUnits(ctx context.Context, productID int32) ([]ProductUnit, error) {
+	rows, err := q.db.Query(ctx, getProductUnits, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ProductUnit
+	for rows.Next() {
+		var i ProductUnit
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.UnitName,
+			&i.ConversionQty,
+			&i.Price,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProfitLossReport = `-- name: GetProfitLossReport :one
+SELECT 
+    COALESCE(SUM(s.total_amount), 0)::NUMERIC(15,2) AS gross_sales,
+    COALESCE(SUM(s.discount_amount), 0)::NUMERIC(15,2) AS total_discounts,
+    COALESCE(COUNT(s.id), 0)::BIGINT AS total_transactions,
+    COALESCE(SUM((SELECT COALESCE(SUM(sd.qty * sd.cogs), 0) FROM sale_details sd WHERE sd.sale_id = s.id)), 0)::NUMERIC(15,2) AS total_cogs,
+    COALESCE(SUM((SELECT COALESCE(SUM(sd.qty), 0) FROM sale_details sd WHERE sd.sale_id = s.id)), 0)::BIGINT AS total_items_sold
+FROM sales s
+WHERE s.status != 'batal'
+  AND s.date >= $1::timestamptz AND s.date <= $2::timestamptz
+`
+
+type GetProfitLossReportParams struct {
+	Column1 pgtype.Timestamptz `json:"column_1"`
+	Column2 pgtype.Timestamptz `json:"column_2"`
+}
+
+type GetProfitLossReportRow struct {
+	GrossSales        pgtype.Numeric `json:"gross_sales"`
+	TotalDiscounts    pgtype.Numeric `json:"total_discounts"`
+	TotalTransactions int64          `json:"total_transactions"`
+	TotalCogs         pgtype.Numeric `json:"total_cogs"`
+	TotalItemsSold    int64          `json:"total_items_sold"`
+}
+
+func (q *Queries) GetProfitLossReport(ctx context.Context, arg GetProfitLossReportParams) (GetProfitLossReportRow, error) {
+	row := q.db.QueryRow(ctx, getProfitLossReport, arg.Column1, arg.Column2)
+	var i GetProfitLossReportRow
+	err := row.Scan(
+		&i.GrossSales,
+		&i.TotalDiscounts,
+		&i.TotalTransactions,
+		&i.TotalCogs,
+		&i.TotalItemsSold,
+	)
+	return i, err
+}
+
+const getPurchaseByID = `-- name: GetPurchaseByID :one
+SELECT 
+	pu.id,
+	pu.invoice_number,
+	pu.supplier_id,
+	COALESCE(s.name, 'Supplier Umum') AS supplier_name,
+	COALESCE(s.phone, '') AS supplier_phone,
+	COALESCE(s.address, '') AS supplier_address,
+	pu.payment_method,
+	pu.total_cost,
+	pu.status,
+	pu.notes,
+	pu.date,
+	pu.received_at
+FROM purchases pu
+LEFT JOIN suppliers s ON pu.supplier_id = s.id
+WHERE pu.id = $1
+LIMIT 1
+`
+
+type GetPurchaseByIDRow struct {
+	ID              int32              `json:"id"`
+	InvoiceNumber   string             `json:"invoice_number"`
+	SupplierID      pgtype.Int4        `json:"supplier_id"`
+	SupplierName    string             `json:"supplier_name"`
+	SupplierPhone   string             `json:"supplier_phone"`
+	SupplierAddress string             `json:"supplier_address"`
+	PaymentMethod   string             `json:"payment_method"`
+	TotalCost       pgtype.Numeric     `json:"total_cost"`
+	Status          string             `json:"status"`
+	Notes           string             `json:"notes"`
+	Date            pgtype.Timestamptz `json:"date"`
+	ReceivedAt      pgtype.Timestamptz `json:"received_at"`
+}
+
+func (q *Queries) GetPurchaseByID(ctx context.Context, id int32) (GetPurchaseByIDRow, error) {
+	row := q.db.QueryRow(ctx, getPurchaseByID, id)
+	var i GetPurchaseByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.InvoiceNumber,
+		&i.SupplierID,
+		&i.SupplierName,
+		&i.SupplierPhone,
+		&i.SupplierAddress,
+		&i.PaymentMethod,
+		&i.TotalCost,
+		&i.Status,
+		&i.Notes,
+		&i.Date,
+		&i.ReceivedAt,
+	)
+	return i, err
+}
+
+const getPurchaseDetails = `-- name: GetPurchaseDetails :many
+SELECT 
+	pd.id,
+	pd.product_id,
+	p.sku,
+	p.name AS product_name,
+	pd.unit_id,
+	pd.unit_name,
+	pd.conversion_qty,
+	pd.qty,
+	pd.cost,
+	pd.subtotal
+FROM purchase_details pd
+JOIN products p ON pd.product_id = p.id
+WHERE pd.purchase_id = $1
+ORDER BY pd.id ASC
+`
+
+type GetPurchaseDetailsRow struct {
+	ID            int32          `json:"id"`
+	ProductID     int32          `json:"product_id"`
+	Sku           string         `json:"sku"`
+	ProductName   string         `json:"product_name"`
+	UnitID        pgtype.Int4    `json:"unit_id"`
+	UnitName      string         `json:"unit_name"`
+	ConversionQty int32          `json:"conversion_qty"`
+	Qty           int32          `json:"qty"`
+	Cost          pgtype.Numeric `json:"cost"`
+	Subtotal      pgtype.Numeric `json:"subtotal"`
+}
+
+func (q *Queries) GetPurchaseDetails(ctx context.Context, purchaseID int32) ([]GetPurchaseDetailsRow, error) {
+	rows, err := q.db.Query(ctx, getPurchaseDetails, purchaseID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPurchaseDetailsRow
+	for rows.Next() {
+		var i GetPurchaseDetailsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.Sku,
+			&i.ProductName,
+			&i.UnitID,
+			&i.UnitName,
+			&i.ConversionQty,
+			&i.Qty,
+			&i.Cost,
+			&i.Subtotal,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPurchasesReport = `-- name: GetPurchasesReport :many
+SELECT 
+    p.id AS purchase_id,
+    p.invoice_number,
+    p.received_at,
+    COALESCE(s.name, 'Supplier Umum') AS supplier_name,
+    p.payment_method,
+    p.total_cost,
+    p.status,
+    p.notes
+FROM purchases p
+LEFT JOIN suppliers s ON p.supplier_id = s.id
+WHERE p.status != 'batal'
+  AND p.received_at >= $1::timestamptz AND p.received_at <= $2::timestamptz
+ORDER BY p.received_at DESC
+`
+
+type GetPurchasesReportParams struct {
+	Column1 pgtype.Timestamptz `json:"column_1"`
+	Column2 pgtype.Timestamptz `json:"column_2"`
+}
+
+type GetPurchasesReportRow struct {
+	PurchaseID    int32              `json:"purchase_id"`
+	InvoiceNumber string             `json:"invoice_number"`
+	ReceivedAt    pgtype.Timestamptz `json:"received_at"`
+	SupplierName  string             `json:"supplier_name"`
+	PaymentMethod string             `json:"payment_method"`
+	TotalCost     pgtype.Numeric     `json:"total_cost"`
+	Status        string             `json:"status"`
+	Notes         string             `json:"notes"`
+}
+
+func (q *Queries) GetPurchasesReport(ctx context.Context, arg GetPurchasesReportParams) ([]GetPurchasesReportRow, error) {
+	rows, err := q.db.Query(ctx, getPurchasesReport, arg.Column1, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPurchasesReportRow
+	for rows.Next() {
+		var i GetPurchasesReportRow
+		if err := rows.Scan(
+			&i.PurchaseID,
+			&i.InvoiceNumber,
+			&i.ReceivedAt,
+			&i.SupplierName,
+			&i.PaymentMethod,
+			&i.TotalCost,
+			&i.Status,
+			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRecentDashboardSales = `-- name: GetRecentDashboardSales :many
+SELECT 
+    s.id,
+    s.invoice_no,
+    COALESCE(c.name, 'Pelanggan Umum') AS customer_name,
+    s.date,
+    s.total_amount,
+    s.paid_amount,
+    s.payment_method,
+    s.payment_status,
+    s.status
+FROM sales s
+LEFT JOIN customers c ON s.customer_id = c.id
+WHERE s.status != 'batal'
+ORDER BY s.id DESC
+LIMIT 7
+`
+
+type GetRecentDashboardSalesRow struct {
+	ID            int32              `json:"id"`
+	InvoiceNo     string             `json:"invoice_no"`
+	CustomerName  string             `json:"customer_name"`
+	Date          pgtype.Timestamptz `json:"date"`
+	TotalAmount   pgtype.Numeric     `json:"total_amount"`
+	PaidAmount    pgtype.Numeric     `json:"paid_amount"`
+	PaymentMethod string             `json:"payment_method"`
+	PaymentStatus string             `json:"payment_status"`
+	Status        string             `json:"status"`
+}
+
+func (q *Queries) GetRecentDashboardSales(ctx context.Context) ([]GetRecentDashboardSalesRow, error) {
+	rows, err := q.db.Query(ctx, getRecentDashboardSales)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetRecentDashboardSalesRow
+	for rows.Next() {
+		var i GetRecentDashboardSalesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.InvoiceNo,
+			&i.CustomerName,
+			&i.Date,
+			&i.TotalAmount,
+			&i.PaidAmount,
+			&i.PaymentMethod,
+			&i.PaymentStatus,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSaleByID = `-- name: GetSaleByID :one
+SELECT 
+	s.id,
+	s.invoice_no,
+	s.customer_id,
+	COALESCE(c.name, 'Pelanggan Umum') AS customer_name,
+	COALESCE(c.phone, '') AS customer_phone,
+	COALESCE(c.address, '') AS customer_address,
+	s.date,
+	s.total_amount,
+	s.discount_amount,
+	s.paid_amount,
+	s.change_amount,
+	s.payment_method,
+	s.payment_status,
+	s.due_date,
+	s.status,
+	s.notes,
+	s.created_at
+FROM sales s
+LEFT JOIN customers c ON s.customer_id = c.id
+WHERE s.id = $1
+LIMIT 1
+`
+
+type GetSaleByIDRow struct {
+	ID              int32              `json:"id"`
+	InvoiceNo       string             `json:"invoice_no"`
+	CustomerID      pgtype.Int4        `json:"customer_id"`
+	CustomerName    string             `json:"customer_name"`
+	CustomerPhone   string             `json:"customer_phone"`
+	CustomerAddress string             `json:"customer_address"`
+	Date            pgtype.Timestamptz `json:"date"`
+	TotalAmount     pgtype.Numeric     `json:"total_amount"`
+	DiscountAmount  pgtype.Numeric     `json:"discount_amount"`
+	PaidAmount      pgtype.Numeric     `json:"paid_amount"`
+	ChangeAmount    pgtype.Numeric     `json:"change_amount"`
+	PaymentMethod   string             `json:"payment_method"`
+	PaymentStatus   string             `json:"payment_status"`
+	DueDate         pgtype.Date        `json:"due_date"`
+	Status          string             `json:"status"`
+	Notes           string             `json:"notes"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) GetSaleByID(ctx context.Context, id int32) (GetSaleByIDRow, error) {
+	row := q.db.QueryRow(ctx, getSaleByID, id)
+	var i GetSaleByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.InvoiceNo,
+		&i.CustomerID,
+		&i.CustomerName,
+		&i.CustomerPhone,
+		&i.CustomerAddress,
+		&i.Date,
+		&i.TotalAmount,
+		&i.DiscountAmount,
+		&i.PaidAmount,
+		&i.ChangeAmount,
+		&i.PaymentMethod,
+		&i.PaymentStatus,
+		&i.DueDate,
+		&i.Status,
+		&i.Notes,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getSaleDetails = `-- name: GetSaleDetails :many
+SELECT 
+	sd.id,
+	sd.sale_id,
+	sd.product_id,
+	p.sku,
+	p.name AS product_name,
+	p.type AS product_type,
+	(p.is_open_price OR sd.is_open_price) AS is_open_price,
+	sd.unit_id,
+	sd.unit_name,
+	sd.conversion_qty,
+	sd.qty,
+	sd.price,
+	sd.discount,
+	sd.subtotal,
+	sd.cogs
+FROM sale_details sd
+JOIN products p ON sd.product_id = p.id
+WHERE sd.sale_id = $1
+ORDER BY sd.id ASC
+`
+
+type GetSaleDetailsRow struct {
+	ID            int32          `json:"id"`
+	SaleID        int32          `json:"sale_id"`
+	ProductID     int32          `json:"product_id"`
+	Sku           string         `json:"sku"`
+	ProductName   string         `json:"product_name"`
+	ProductType   string         `json:"product_type"`
+	IsOpenPrice   pgtype.Bool    `json:"is_open_price"`
+	UnitID        pgtype.Int4    `json:"unit_id"`
+	UnitName      string         `json:"unit_name"`
+	ConversionQty int32          `json:"conversion_qty"`
+	Qty           int32          `json:"qty"`
+	Price         pgtype.Numeric `json:"price"`
+	Discount      pgtype.Numeric `json:"discount"`
+	Subtotal      pgtype.Numeric `json:"subtotal"`
+	Cogs          pgtype.Numeric `json:"cogs"`
+}
+
+func (q *Queries) GetSaleDetails(ctx context.Context, saleID int32) ([]GetSaleDetailsRow, error) {
+	rows, err := q.db.Query(ctx, getSaleDetails, saleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSaleDetailsRow
+	for rows.Next() {
+		var i GetSaleDetailsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SaleID,
+			&i.ProductID,
+			&i.Sku,
+			&i.ProductName,
+			&i.ProductType,
+			&i.IsOpenPrice,
+			&i.UnitID,
+			&i.UnitName,
+			&i.ConversionQty,
+			&i.Qty,
+			&i.Price,
+			&i.Discount,
+			&i.Subtotal,
+			&i.Cogs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSalesDetailReport = `-- name: GetSalesDetailReport :many
+SELECT 
+    s.id AS sale_id,
+    s.invoice_no,
+    s.date AS sale_date,
+    COALESCE(c.name, 'Pelanggan Umum') AS customer_name,
+    p.id AS product_id,
+    p.sku AS product_sku,
+    p.name AS product_name,
+    COALESCE(cat.name, 'Umum') AS category_name,
+    sd.unit_name,
+    sd.qty,
+    sd.price,
+    sd.discount,
+    sd.subtotal,
+    sd.cogs,
+    (sd.subtotal - (sd.qty * sd.cogs))::NUMERIC(15,2) AS item_profit
+FROM sale_details sd
+JOIN sales s ON sd.sale_id = s.id
+JOIN products p ON sd.product_id = p.id
+LEFT JOIN categories cat ON p.category_id = cat.id
+LEFT JOIN customers c ON s.customer_id = c.id
+WHERE s.status != 'batal'
+  AND s.date >= $1::timestamptz AND s.date <= $2::timestamptz
+  AND ($3::text = '' OR p.name ILIKE $3 OR p.sku ILIKE $3 OR s.invoice_no ILIKE $3)
+  AND ($4::int = 0 OR p.category_id = $4)
+ORDER BY s.date DESC, sd.id ASC
+LIMIT $5 OFFSET $6
+`
+
+type GetSalesDetailReportParams struct {
+	Column1 pgtype.Timestamptz `json:"column_1"`
+	Column2 pgtype.Timestamptz `json:"column_2"`
+	Column3 string             `json:"column_3"`
+	Column4 int32              `json:"column_4"`
+	Limit   int32              `json:"limit"`
+	Offset  int32              `json:"offset"`
+}
+
+type GetSalesDetailReportRow struct {
+	SaleID       int32              `json:"sale_id"`
+	InvoiceNo    string             `json:"invoice_no"`
+	SaleDate     pgtype.Timestamptz `json:"sale_date"`
+	CustomerName string             `json:"customer_name"`
+	ProductID    int32              `json:"product_id"`
+	ProductSku   string             `json:"product_sku"`
+	ProductName  string             `json:"product_name"`
+	CategoryName string             `json:"category_name"`
+	UnitName     string             `json:"unit_name"`
+	Qty          int32              `json:"qty"`
+	Price        pgtype.Numeric     `json:"price"`
+	Discount     pgtype.Numeric     `json:"discount"`
+	Subtotal     pgtype.Numeric     `json:"subtotal"`
+	Cogs         pgtype.Numeric     `json:"cogs"`
+	ItemProfit   pgtype.Numeric     `json:"item_profit"`
+}
+
+func (q *Queries) GetSalesDetailReport(ctx context.Context, arg GetSalesDetailReportParams) ([]GetSalesDetailReportRow, error) {
+	rows, err := q.db.Query(ctx, getSalesDetailReport,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSalesDetailReportRow
+	for rows.Next() {
+		var i GetSalesDetailReportRow
+		if err := rows.Scan(
+			&i.SaleID,
+			&i.InvoiceNo,
+			&i.SaleDate,
+			&i.CustomerName,
+			&i.ProductID,
+			&i.ProductSku,
+			&i.ProductName,
+			&i.CategoryName,
+			&i.UnitName,
+			&i.Qty,
+			&i.Price,
+			&i.Discount,
+			&i.Subtotal,
+			&i.Cogs,
+			&i.ItemProfit,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSalesReportDaily = `-- name: GetSalesReportDaily :many
+SELECT 
+    DATE(s.date)::DATE AS sale_date,
+    COUNT(s.id)::BIGINT AS transaction_count,
+    COALESCE(SUM(s.total_amount), 0)::NUMERIC(15,2) AS total_gross_sales,
+    COALESCE(SUM(s.discount_amount), 0)::NUMERIC(15,2) AS total_discounts,
+    COALESCE(SUM(s.total_amount), 0)::NUMERIC(15,2) AS total_net_sales,
+    COALESCE(SUM((SELECT COALESCE(SUM(sd.qty * sd.cogs), 0) FROM sale_details sd WHERE sd.sale_id = s.id)), 0)::NUMERIC(15,2) AS total_cogs,
+    COALESCE(SUM((SELECT COALESCE(SUM(sd.qty * (sd.price - sd.cogs)), 0) FROM sale_details sd WHERE sd.sale_id = s.id) - s.discount_amount), 0)::NUMERIC(15,2) AS gross_profit
+FROM sales s
+WHERE s.status != 'batal'
+  AND s.date >= $1::timestamptz AND s.date <= $2::timestamptz
+GROUP BY DATE(s.date)
+ORDER BY DATE(s.date) DESC
+`
+
+type GetSalesReportDailyParams struct {
+	Column1 pgtype.Timestamptz `json:"column_1"`
+	Column2 pgtype.Timestamptz `json:"column_2"`
+}
+
+type GetSalesReportDailyRow struct {
+	SaleDate         pgtype.Date    `json:"sale_date"`
+	TransactionCount int64          `json:"transaction_count"`
+	TotalGrossSales  pgtype.Numeric `json:"total_gross_sales"`
+	TotalDiscounts   pgtype.Numeric `json:"total_discounts"`
+	TotalNetSales    pgtype.Numeric `json:"total_net_sales"`
+	TotalCogs        pgtype.Numeric `json:"total_cogs"`
+	GrossProfit      pgtype.Numeric `json:"gross_profit"`
+}
+
+func (q *Queries) GetSalesReportDaily(ctx context.Context, arg GetSalesReportDailyParams) ([]GetSalesReportDailyRow, error) {
+	rows, err := q.db.Query(ctx, getSalesReportDaily, arg.Column1, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSalesReportDailyRow
+	for rows.Next() {
+		var i GetSalesReportDailyRow
+		if err := rows.Scan(
+			&i.SaleDate,
+			&i.TransactionCount,
+			&i.TotalGrossSales,
+			&i.TotalDiscounts,
+			&i.TotalNetSales,
+			&i.TotalCogs,
+			&i.GrossProfit,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSalesReportPaymentMethods = `-- name: GetSalesReportPaymentMethods :many
+SELECT 
+    s.payment_method,
+    COUNT(s.id)::BIGINT AS transaction_count,
+    COALESCE(SUM(s.total_amount), 0)::NUMERIC(15,2) AS total_amount
+FROM sales s
+WHERE s.status != 'batal'
+  AND s.date >= $1::timestamptz AND s.date <= $2::timestamptz
+GROUP BY s.payment_method
+ORDER BY total_amount DESC
+`
+
+type GetSalesReportPaymentMethodsParams struct {
+	Column1 pgtype.Timestamptz `json:"column_1"`
+	Column2 pgtype.Timestamptz `json:"column_2"`
+}
+
+type GetSalesReportPaymentMethodsRow struct {
+	PaymentMethod    string         `json:"payment_method"`
+	TransactionCount int64          `json:"transaction_count"`
+	TotalAmount      pgtype.Numeric `json:"total_amount"`
+}
+
+func (q *Queries) GetSalesReportPaymentMethods(ctx context.Context, arg GetSalesReportPaymentMethodsParams) ([]GetSalesReportPaymentMethodsRow, error) {
+	rows, err := q.db.Query(ctx, getSalesReportPaymentMethods, arg.Column1, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSalesReportPaymentMethodsRow
+	for rows.Next() {
+		var i GetSalesReportPaymentMethodsRow
+		if err := rows.Scan(&i.PaymentMethod, &i.TransactionCount, &i.TotalAmount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStockAdjustmentByID = `-- name: GetStockAdjustmentByID :one
+SELECT 
+    sa.id,
+    sa.adjustment_no,
+    sa.date,
+    sa.product_id,
+    p.sku AS product_sku,
+    p.name AS product_name,
+    c.name AS category_name,
+    pu.unit_name AS base_unit_name,
+    sa.system_stock,
+    sa.physical_stock,
+    sa.difference_qty,
+    sa.reason,
+    sa.notes,
+    sa.created_at
+FROM stock_adjustments sa
+JOIN products p ON sa.product_id = p.id
+LEFT JOIN categories c ON p.category_id = c.id
+LEFT JOIN product_units pu ON p.id = pu.product_id AND pu.conversion_qty = 1 AND pu.is_active = true
+WHERE sa.id = $1 LIMIT 1
+`
+
+type GetStockAdjustmentByIDRow struct {
+	ID            int32              `json:"id"`
+	AdjustmentNo  string             `json:"adjustment_no"`
+	Date          pgtype.Timestamptz `json:"date"`
+	ProductID     int32              `json:"product_id"`
+	ProductSku    string             `json:"product_sku"`
+	ProductName   string             `json:"product_name"`
+	CategoryName  pgtype.Text        `json:"category_name"`
+	BaseUnitName  pgtype.Text        `json:"base_unit_name"`
+	SystemStock   int32              `json:"system_stock"`
+	PhysicalStock int32              `json:"physical_stock"`
+	DifferenceQty int32              `json:"difference_qty"`
+	Reason        string             `json:"reason"`
+	Notes         string             `json:"notes"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) GetStockAdjustmentByID(ctx context.Context, id int32) (GetStockAdjustmentByIDRow, error) {
+	row := q.db.QueryRow(ctx, getStockAdjustmentByID, id)
+	var i GetStockAdjustmentByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.AdjustmentNo,
+		&i.Date,
+		&i.ProductID,
+		&i.ProductSku,
+		&i.ProductName,
+		&i.CategoryName,
+		&i.BaseUnitName,
+		&i.SystemStock,
+		&i.PhysicalStock,
+		&i.DifferenceQty,
+		&i.Reason,
+		&i.Notes,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getStockValuationReport = `-- name: GetStockValuationReport :many
+SELECT 
+    p.id AS product_id,
+    p.sku AS product_sku,
+    p.name AS product_name,
+    COALESCE(c.name, 'Umum') AS category_name,
+    p.current_stock,
+    COALESCE(pu.unit_name, 'Pcs') AS unit_name,
+    p.average_cost,
+    COALESCE(pu.price, 0)::NUMERIC(15,2) AS retail_price,
+    (p.current_stock * p.average_cost)::NUMERIC(15,2) AS total_cost_value,
+    (p.current_stock * COALESCE(pu.price, 0))::NUMERIC(15,2) AS total_retail_value,
+    ((p.current_stock * COALESCE(pu.price, 0)) - (p.current_stock * p.average_cost))::NUMERIC(15,2) AS potential_profit
+FROM products p
+LEFT JOIN categories c ON p.category_id = c.id
+LEFT JOIN product_units pu ON p.id = pu.product_id AND pu.conversion_qty = 1 AND pu.is_active = true
+WHERE p.is_active = true 
+  AND p.type = 'barang'
+ORDER BY total_cost_value DESC
+`
+
+type GetStockValuationReportRow struct {
+	ProductID        int32          `json:"product_id"`
+	ProductSku       string         `json:"product_sku"`
+	ProductName      string         `json:"product_name"`
+	CategoryName     string         `json:"category_name"`
+	CurrentStock     int32          `json:"current_stock"`
+	UnitName         string         `json:"unit_name"`
+	AverageCost      pgtype.Numeric `json:"average_cost"`
+	RetailPrice      pgtype.Numeric `json:"retail_price"`
+	TotalCostValue   pgtype.Numeric `json:"total_cost_value"`
+	TotalRetailValue pgtype.Numeric `json:"total_retail_value"`
+	PotentialProfit  pgtype.Numeric `json:"potential_profit"`
+}
+
+func (q *Queries) GetStockValuationReport(ctx context.Context) ([]GetStockValuationReportRow, error) {
+	rows, err := q.db.Query(ctx, getStockValuationReport)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetStockValuationReportRow
+	for rows.Next() {
+		var i GetStockValuationReportRow
+		if err := rows.Scan(
+			&i.ProductID,
+			&i.ProductSku,
+			&i.ProductName,
+			&i.CategoryName,
+			&i.CurrentStock,
+			&i.UnitName,
+			&i.AverageCost,
+			&i.RetailPrice,
+			&i.TotalCostValue,
+			&i.TotalRetailValue,
+			&i.PotentialProfit,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSupplierByID = `-- name: GetSupplierByID :one
+SELECT id, name, phone, address, is_active, created_at, updated_at FROM suppliers
+WHERE id = $1 AND is_active = true
+LIMIT 1
+`
+
+func (q *Queries) GetSupplierByID(ctx context.Context, id int32) (Supplier, error) {
+	row := q.db.QueryRow(ctx, getSupplierByID, id)
+	var i Supplier
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Phone,
+		&i.Address,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getTodayReceivablesMetrics = `-- name: GetTodayReceivablesMetrics :one
+SELECT 
+    COALESCE(SUM(total_amount - paid_amount), 0)::NUMERIC(15,2) AS total_unpaid_debt,
+    COALESCE(COUNT(DISTINCT customer_id), 0)::BIGINT AS customers_count,
+    COALESCE(SUM(
+        CASE WHEN due_date IS NOT NULL AND due_date < CURRENT_DATE 
+             THEN (total_amount - paid_amount) 
+             ELSE 0 
+        END
+    ), 0)::NUMERIC(15,2) AS overdue_debt
+FROM sales
+WHERE status != 'batal'
+  AND payment_status = 'kasbon'
+`
+
+type GetTodayReceivablesMetricsRow struct {
+	TotalUnpaidDebt pgtype.Numeric `json:"total_unpaid_debt"`
+	CustomersCount  int64          `json:"customers_count"`
+	OverdueDebt     pgtype.Numeric `json:"overdue_debt"`
+}
+
+func (q *Queries) GetTodayReceivablesMetrics(ctx context.Context) (GetTodayReceivablesMetricsRow, error) {
+	row := q.db.QueryRow(ctx, getTodayReceivablesMetrics)
+	var i GetTodayReceivablesMetricsRow
+	err := row.Scan(&i.TotalUnpaidDebt, &i.CustomersCount, &i.OverdueDebt)
+	return i, err
+}
+
+const getTodaySalesMetrics = `-- name: GetTodaySalesMetrics :one
+SELECT 
+    COALESCE(SUM(s.total_amount), 0)::NUMERIC(15,2) AS total_sales,
+    COALESCE(SUM(s.discount_amount), 0)::NUMERIC(15,2) AS total_discount,
+    COALESCE(COUNT(s.id), 0)::BIGINT AS total_transactions,
+    COALESCE(SUM(
+        (SELECT COALESCE(SUM(sd.qty * sd.cogs), 0) FROM sale_details sd WHERE sd.sale_id = s.id)
+    ), 0)::NUMERIC(15,2) AS total_cogs
+FROM sales s
+WHERE s.status != 'batal'
+  AND DATE(s.date) = CURRENT_DATE
+`
+
+type GetTodaySalesMetricsRow struct {
+	TotalSales        pgtype.Numeric `json:"total_sales"`
+	TotalDiscount     pgtype.Numeric `json:"total_discount"`
+	TotalTransactions int64          `json:"total_transactions"`
+	TotalCogs         pgtype.Numeric `json:"total_cogs"`
+}
+
+func (q *Queries) GetTodaySalesMetrics(ctx context.Context) (GetTodaySalesMetricsRow, error) {
+	row := q.db.QueryRow(ctx, getTodaySalesMetrics)
+	var i GetTodaySalesMetricsRow
+	err := row.Scan(
+		&i.TotalSales,
+		&i.TotalDiscount,
+		&i.TotalTransactions,
+		&i.TotalCogs,
+	)
+	return i, err
+}
+
+const getTopProductsTodayOrWeek = `-- name: GetTopProductsTodayOrWeek :many
+SELECT 
+    p.id AS product_id,
+    p.name AS product_name,
+    p.sku AS product_sku,
+    COALESCE(c.name, 'Umum') AS category_name,
+    COALESCE(SUM(sd.qty), 0)::BIGINT AS total_qty_sold,
+    COALESCE(SUM(sd.subtotal), 0)::NUMERIC(15,2) AS total_revenue
+FROM sale_details sd
+JOIN sales s ON sd.sale_id = s.id
+JOIN products p ON sd.product_id = p.id
+LEFT JOIN categories c ON p.category_id = c.id
+WHERE s.status != 'batal'
+  AND s.date >= CURRENT_DATE - INTERVAL '7 days'
+GROUP BY p.id, p.name, p.sku, c.name
+ORDER BY total_qty_sold DESC, total_revenue DESC
+LIMIT 5
+`
+
+type GetTopProductsTodayOrWeekRow struct {
+	ProductID    int32          `json:"product_id"`
+	ProductName  string         `json:"product_name"`
+	ProductSku   string         `json:"product_sku"`
+	CategoryName string         `json:"category_name"`
+	TotalQtySold int64          `json:"total_qty_sold"`
+	TotalRevenue pgtype.Numeric `json:"total_revenue"`
+}
+
+func (q *Queries) GetTopProductsTodayOrWeek(ctx context.Context) ([]GetTopProductsTodayOrWeekRow, error) {
+	rows, err := q.db.Query(ctx, getTopProductsTodayOrWeek)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetTopProductsTodayOrWeekRow
+	for rows.Next() {
+		var i GetTopProductsTodayOrWeekRow
+		if err := rows.Scan(
+			&i.ProductID,
+			&i.ProductName,
+			&i.ProductSku,
+			&i.CategoryName,
+			&i.TotalQtySold,
+			&i.TotalRevenue,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUserByID = `-- name: GetUserByID :one
+SELECT id, username, name, password_hash, role, is_active, created_at, updated_at FROM users
+WHERE id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetUserByID(ctx context.Context, id int32) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Name,
+		&i.PasswordHash,
+		&i.Role,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByUsername = `-- name: GetUserByUsername :one
+SELECT id, username, name, password_hash, role, is_active, created_at, updated_at FROM users
+WHERE LOWER(username) = LOWER($1)
+LIMIT 1
+`
+
+func (q *Queries) GetUserByUsername(ctx context.Context, lower string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByUsername, lower)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Name,
+		&i.PasswordHash,
+		&i.Role,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getWeeklySalesTrend = `-- name: GetWeeklySalesTrend :many
+WITH last_7_days AS (
+    SELECT generate_series(
+        CURRENT_DATE - INTERVAL '6 days',
+        CURRENT_DATE,
+        INTERVAL '1 day'
+    )::DATE AS day_date
+)
+SELECT 
+    d.day_date,
+    TO_CHAR(d.day_date, 'Dy, DD/MM') AS day_label,
+    COALESCE(SUM(s.total_amount), 0)::NUMERIC(15,2) AS total_sales,
+    COALESCE(COUNT(s.id), 0)::BIGINT AS total_transactions,
+    COALESCE(SUM(
+        (SELECT COALESCE(SUM(sd.qty * (sd.price - sd.cogs)), 0) FROM sale_details sd WHERE sd.sale_id = s.id)
+    ), 0)::NUMERIC(15,2) AS gross_profit
+FROM last_7_days d
+LEFT JOIN sales s ON DATE(s.date) = d.day_date AND s.status != 'batal'
+GROUP BY d.day_date
+ORDER BY d.day_date ASC
+`
+
+type GetWeeklySalesTrendRow struct {
+	DayDate           pgtype.Date    `json:"day_date"`
+	DayLabel          string         `json:"day_label"`
+	TotalSales        pgtype.Numeric `json:"total_sales"`
+	TotalTransactions int64          `json:"total_transactions"`
+	GrossProfit       pgtype.Numeric `json:"gross_profit"`
+}
+
+func (q *Queries) GetWeeklySalesTrend(ctx context.Context) ([]GetWeeklySalesTrendRow, error) {
+	rows, err := q.db.Query(ctx, getWeeklySalesTrend)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetWeeklySalesTrendRow
+	for rows.Next() {
+		var i GetWeeklySalesTrendRow
+		if err := rows.Scan(
+			&i.DayDate,
+			&i.DayLabel,
+			&i.TotalSales,
+			&i.TotalTransactions,
+			&i.GrossProfit,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listActiveGoodsProducts = `-- name: ListActiveGoodsProducts :many
+SELECT id, category_id, sku, name, type, is_open_price, current_stock, average_cost, is_active, created_at, updated_at, min_stock FROM products
+WHERE is_active = true AND type = 'barang'
+ORDER BY name ASC
+`
+
+func (q *Queries) ListActiveGoodsProducts(ctx context.Context) ([]Product, error) {
+	rows, err := q.db.Query(ctx, listActiveGoodsProducts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Product
+	for rows.Next() {
+		var i Product
+		if err := rows.Scan(
+			&i.ID,
+			&i.CategoryID,
+			&i.Sku,
+			&i.Name,
+			&i.Type,
+			&i.IsOpenPrice,
+			&i.CurrentStock,
+			&i.AverageCost,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.MinStock,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAllActiveProductUnitsWithLastCost = `-- name: ListAllActiveProductUnitsWithLastCost :many
+SELECT 
+	pu.id,
+	pu.product_id,
+	pu.unit_name,
+	pu.conversion_qty,
+	COALESCE(
+		(
+			SELECT pd.cost 
+			FROM purchase_details pd
+			JOIN purchases pur ON pd.purchase_id = pur.id
+			WHERE pd.product_id = pu.product_id 
+			  AND LOWER(pd.unit_name) = LOWER(pu.unit_name)
+			  AND pur.status != 'batal'
+			ORDER BY pd.id DESC
+			LIMIT 1
+		),
+		(p.average_cost * pu.conversion_qty)
+	)::NUMERIC(15,2) AS last_cost
+FROM product_units pu
+JOIN products p ON pu.product_id = p.id
+WHERE pu.is_active = true AND p.is_active = true AND p.type = 'barang'
+ORDER BY pu.product_id ASC, pu.conversion_qty DESC
+`
+
+type ListAllActiveProductUnitsWithLastCostRow struct {
+	ID            int32          `json:"id"`
+	ProductID     int32          `json:"product_id"`
+	UnitName      string         `json:"unit_name"`
+	ConversionQty int32          `json:"conversion_qty"`
+	LastCost      pgtype.Numeric `json:"last_cost"`
+}
+
+func (q *Queries) ListAllActiveProductUnitsWithLastCost(ctx context.Context) ([]ListAllActiveProductUnitsWithLastCostRow, error) {
+	rows, err := q.db.Query(ctx, listAllActiveProductUnitsWithLastCost)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllActiveProductUnitsWithLastCostRow
+	for rows.Next() {
+		var i ListAllActiveProductUnitsWithLastCostRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.UnitName,
+			&i.ConversionQty,
+			&i.LastCost,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listCategories = `-- name: ListCategories :many
@@ -99,6 +2258,974 @@ func (q *Queries) ListCategories(ctx context.Context) ([]Category, error) {
 	return items, nil
 }
 
+const listCustomerDebtRecap = `-- name: ListCustomerDebtRecap :many
+SELECT 
+    c.id AS customer_id,
+    c.name AS customer_name,
+    COALESCE(c.phone, '') AS customer_phone,
+    COALESCE(c.address, '') AS customer_address,
+    COALESCE(c.is_active, true)::BOOLEAN AS is_active,
+    COUNT(s.id)::BIGINT AS total_invoices,
+    SUM(s.total_amount)::NUMERIC(15,2) AS total_debt_amount,
+    SUM(s.paid_amount)::NUMERIC(15,2) AS total_paid_amount,
+    SUM(s.total_amount - s.paid_amount)::NUMERIC(15,2) AS remaining_debt,
+    MIN(s.due_date)::DATE AS earliest_due_date,
+    MAX(s.date)::TIMESTAMPTZ AS latest_sale_date,
+    BOOL_OR(s.due_date IS NOT NULL AND s.due_date < CURRENT_DATE) AS has_overdue
+FROM sales s
+JOIN customers c ON s.customer_id = c.id
+WHERE s.status != 'batal'
+  AND s.payment_status = 'kasbon'
+  AND ($1::text = '' OR c.name ILIKE $1 OR c.phone ILIKE $1)
+GROUP BY c.id, c.name, c.phone, c.address, c.is_active
+HAVING SUM(s.total_amount - s.paid_amount) > 0
+ORDER BY 
+    CASE WHEN $2 = 'overdue' THEN (CASE WHEN BOOL_OR(s.due_date IS NOT NULL AND s.due_date < CURRENT_DATE) THEN 0 ELSE 1 END) END ASC,
+    CASE WHEN $2 = 'debt_desc' THEN SUM(s.total_amount - s.paid_amount) END DESC,
+    CASE WHEN $2 = 'debt_asc' THEN SUM(s.total_amount - s.paid_amount) END ASC,
+    c.name ASC
+`
+
+type ListCustomerDebtRecapParams struct {
+	Column1 string      `json:"column_1"`
+	Column2 interface{} `json:"column_2"`
+}
+
+type ListCustomerDebtRecapRow struct {
+	CustomerID      int32              `json:"customer_id"`
+	CustomerName    string             `json:"customer_name"`
+	CustomerPhone   string             `json:"customer_phone"`
+	CustomerAddress string             `json:"customer_address"`
+	IsActive        bool               `json:"is_active"`
+	TotalInvoices   int64              `json:"total_invoices"`
+	TotalDebtAmount pgtype.Numeric     `json:"total_debt_amount"`
+	TotalPaidAmount pgtype.Numeric     `json:"total_paid_amount"`
+	RemainingDebt   pgtype.Numeric     `json:"remaining_debt"`
+	EarliestDueDate pgtype.Date        `json:"earliest_due_date"`
+	LatestSaleDate  pgtype.Timestamptz `json:"latest_sale_date"`
+	HasOverdue      bool               `json:"has_overdue"`
+}
+
+func (q *Queries) ListCustomerDebtRecap(ctx context.Context, arg ListCustomerDebtRecapParams) ([]ListCustomerDebtRecapRow, error) {
+	rows, err := q.db.Query(ctx, listCustomerDebtRecap, arg.Column1, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCustomerDebtRecapRow
+	for rows.Next() {
+		var i ListCustomerDebtRecapRow
+		if err := rows.Scan(
+			&i.CustomerID,
+			&i.CustomerName,
+			&i.CustomerPhone,
+			&i.CustomerAddress,
+			&i.IsActive,
+			&i.TotalInvoices,
+			&i.TotalDebtAmount,
+			&i.TotalPaidAmount,
+			&i.RemainingDebt,
+			&i.EarliestDueDate,
+			&i.LatestSaleDate,
+			&i.HasOverdue,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCustomerUnpaidInvoices = `-- name: ListCustomerUnpaidInvoices :many
+SELECT 
+    s.id AS sale_id,
+    s.invoice_no,
+    s.date,
+    s.due_date,
+    s.total_amount,
+    s.paid_amount,
+    (s.total_amount - s.paid_amount)::NUMERIC(15,2) AS remaining_amount,
+    s.payment_status,
+    s.notes,
+    (s.due_date IS NOT NULL AND s.due_date < CURRENT_DATE) AS is_overdue
+FROM sales s
+WHERE s.customer_id = $1
+  AND s.status != 'batal'
+  AND s.payment_status = 'kasbon'
+ORDER BY s.id ASC
+`
+
+type ListCustomerUnpaidInvoicesRow struct {
+	SaleID          int32              `json:"sale_id"`
+	InvoiceNo       string             `json:"invoice_no"`
+	Date            pgtype.Timestamptz `json:"date"`
+	DueDate         pgtype.Date        `json:"due_date"`
+	TotalAmount     pgtype.Numeric     `json:"total_amount"`
+	PaidAmount      pgtype.Numeric     `json:"paid_amount"`
+	RemainingAmount pgtype.Numeric     `json:"remaining_amount"`
+	PaymentStatus   string             `json:"payment_status"`
+	Notes           string             `json:"notes"`
+	IsOverdue       pgtype.Bool        `json:"is_overdue"`
+}
+
+func (q *Queries) ListCustomerUnpaidInvoices(ctx context.Context, customerID pgtype.Int4) ([]ListCustomerUnpaidInvoicesRow, error) {
+	rows, err := q.db.Query(ctx, listCustomerUnpaidInvoices, customerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCustomerUnpaidInvoicesRow
+	for rows.Next() {
+		var i ListCustomerUnpaidInvoicesRow
+		if err := rows.Scan(
+			&i.SaleID,
+			&i.InvoiceNo,
+			&i.Date,
+			&i.DueDate,
+			&i.TotalAmount,
+			&i.PaidAmount,
+			&i.RemainingAmount,
+			&i.PaymentStatus,
+			&i.Notes,
+			&i.IsOverdue,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCustomers = `-- name: ListCustomers :many
+SELECT id, name, phone, address, is_active, created_at, updated_at FROM customers
+WHERE is_active = true
+ORDER BY name ASC
+`
+
+func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
+	rows, err := q.db.Query(ctx, listCustomers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Customer
+	for rows.Next() {
+		var i Customer
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Phone,
+			&i.Address,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCustomersWithFilter = `-- name: ListCustomersWithFilter :many
+SELECT id, name, phone, address, is_active, created_at, updated_at FROM customers
+WHERE (
+    ($1::text = 'active' AND is_active = true) OR
+    ($1::text = 'inactive' AND is_active = false) OR
+    ($1::text = 'all')
+)
+ORDER BY name ASC
+`
+
+func (q *Queries) ListCustomersWithFilter(ctx context.Context, dollar_1 string) ([]Customer, error) {
+	rows, err := q.db.Query(ctx, listCustomersWithFilter, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Customer
+	for rows.Next() {
+		var i Customer
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Phone,
+			&i.Address,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDebtInvoices = `-- name: ListDebtInvoices :many
+SELECT 
+    s.id AS sale_id,
+    s.invoice_no,
+    s.customer_id,
+    COALESCE(c.name, 'Pelanggan Umum') AS customer_name,
+    COALESCE(c.phone, '') AS customer_phone,
+    COALESCE(c.is_active, true)::BOOLEAN AS is_customer_active,
+    s.date,
+    s.due_date,
+    s.total_amount,
+    s.paid_amount,
+    (s.total_amount - s.paid_amount)::NUMERIC(15,2) AS remaining_amount,
+    s.payment_status,
+    s.status,
+    s.notes,
+    (s.due_date IS NOT NULL AND s.due_date < CURRENT_DATE AND s.payment_status = 'kasbon') AS is_overdue
+FROM sales s
+LEFT JOIN customers c ON s.customer_id = c.id
+WHERE s.status != 'batal'
+  AND ($1::text = '' OR s.invoice_no ILIKE $1 OR c.name ILIKE $1 OR c.phone ILIKE $1)
+  AND (
+      ($2::text = 'kasbon' AND s.payment_status = 'kasbon') OR
+      ($2::text = 'lunas' AND s.payment_status = 'lunas') OR
+      ($2::text = 'overdue' AND s.payment_status = 'kasbon' AND s.due_date IS NOT NULL AND s.due_date < CURRENT_DATE) OR
+      ($2::text = '' OR $2::text = 'all')
+  )
+ORDER BY 
+    CASE WHEN s.payment_status = 'kasbon' THEN 0 ELSE 1 END,
+    s.id DESC
+LIMIT $3 OFFSET $4
+`
+
+type ListDebtInvoicesParams struct {
+	Column1 string `json:"column_1"`
+	Column2 string `json:"column_2"`
+	Limit   int32  `json:"limit"`
+	Offset  int32  `json:"offset"`
+}
+
+type ListDebtInvoicesRow struct {
+	SaleID           int32              `json:"sale_id"`
+	InvoiceNo        string             `json:"invoice_no"`
+	CustomerID       pgtype.Int4        `json:"customer_id"`
+	CustomerName     string             `json:"customer_name"`
+	CustomerPhone    string             `json:"customer_phone"`
+	IsCustomerActive bool               `json:"is_customer_active"`
+	Date             pgtype.Timestamptz `json:"date"`
+	DueDate          pgtype.Date        `json:"due_date"`
+	TotalAmount      pgtype.Numeric     `json:"total_amount"`
+	PaidAmount       pgtype.Numeric     `json:"paid_amount"`
+	RemainingAmount  pgtype.Numeric     `json:"remaining_amount"`
+	PaymentStatus    string             `json:"payment_status"`
+	Status           string             `json:"status"`
+	Notes            string             `json:"notes"`
+	IsOverdue        pgtype.Bool        `json:"is_overdue"`
+}
+
+func (q *Queries) ListDebtInvoices(ctx context.Context, arg ListDebtInvoicesParams) ([]ListDebtInvoicesRow, error) {
+	rows, err := q.db.Query(ctx, listDebtInvoices,
+		arg.Column1,
+		arg.Column2,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDebtInvoicesRow
+	for rows.Next() {
+		var i ListDebtInvoicesRow
+		if err := rows.Scan(
+			&i.SaleID,
+			&i.InvoiceNo,
+			&i.CustomerID,
+			&i.CustomerName,
+			&i.CustomerPhone,
+			&i.IsCustomerActive,
+			&i.Date,
+			&i.DueDate,
+			&i.TotalAmount,
+			&i.PaidAmount,
+			&i.RemainingAmount,
+			&i.PaymentStatus,
+			&i.Status,
+			&i.Notes,
+			&i.IsOverdue,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDebtPaymentsByCustomerID = `-- name: ListDebtPaymentsByCustomerID :many
+SELECT 
+    dp.id,
+    dp.sale_id,
+    s.invoice_no,
+    dp.date,
+    dp.amount_paid,
+    dp.notes,
+    dp.created_at
+FROM debt_payments dp
+JOIN sales s ON dp.sale_id = s.id
+WHERE s.customer_id = $1
+ORDER BY dp.id DESC
+LIMIT 50
+`
+
+type ListDebtPaymentsByCustomerIDRow struct {
+	ID         int32              `json:"id"`
+	SaleID     int32              `json:"sale_id"`
+	InvoiceNo  string             `json:"invoice_no"`
+	Date       pgtype.Timestamptz `json:"date"`
+	AmountPaid pgtype.Numeric     `json:"amount_paid"`
+	Notes      string             `json:"notes"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListDebtPaymentsByCustomerID(ctx context.Context, customerID pgtype.Int4) ([]ListDebtPaymentsByCustomerIDRow, error) {
+	rows, err := q.db.Query(ctx, listDebtPaymentsByCustomerID, customerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDebtPaymentsByCustomerIDRow
+	for rows.Next() {
+		var i ListDebtPaymentsByCustomerIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SaleID,
+			&i.InvoiceNo,
+			&i.Date,
+			&i.AmountPaid,
+			&i.Notes,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPOSProductUnits = `-- name: ListPOSProductUnits :many
+SELECT 
+	pu.id,
+	pu.product_id,
+	pu.unit_name,
+	pu.conversion_qty,
+	pu.price
+FROM product_units pu
+JOIN products p ON pu.product_id = p.id
+WHERE pu.is_active = true AND p.is_active = true
+ORDER BY pu.product_id ASC, pu.conversion_qty ASC
+`
+
+type ListPOSProductUnitsRow struct {
+	ID            int32          `json:"id"`
+	ProductID     int32          `json:"product_id"`
+	UnitName      string         `json:"unit_name"`
+	ConversionQty int32          `json:"conversion_qty"`
+	Price         pgtype.Numeric `json:"price"`
+}
+
+func (q *Queries) ListPOSProductUnits(ctx context.Context) ([]ListPOSProductUnitsRow, error) {
+	rows, err := q.db.Query(ctx, listPOSProductUnits)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPOSProductUnitsRow
+	for rows.Next() {
+		var i ListPOSProductUnitsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.UnitName,
+			&i.ConversionQty,
+			&i.Price,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPOSProducts = `-- name: ListPOSProducts :many
+SELECT 
+	p.id,
+	p.category_id,
+	c.name AS category_name,
+	p.sku,
+	p.name,
+	p.type,
+	p.is_open_price,
+	p.current_stock,
+	p.average_cost,
+	p.min_stock
+FROM products p
+JOIN categories c ON p.category_id = c.id
+LEFT JOIN (
+    SELECT 
+        sd.product_id,
+        COUNT(sd.id) AS sales_count,
+        SUM(sd.qty * sd.conversion_qty) AS total_qty
+    FROM sale_details sd
+    JOIN sales s ON sd.sale_id = s.id
+    WHERE s.status != 'batal'
+    GROUP BY sd.product_id
+) stats ON p.id = stats.product_id
+WHERE p.is_active = true
+ORDER BY COALESCE(stats.sales_count, 0) DESC, COALESCE(stats.total_qty, 0) DESC, p.name ASC
+`
+
+type ListPOSProductsRow struct {
+	ID           int32          `json:"id"`
+	CategoryID   int32          `json:"category_id"`
+	CategoryName string         `json:"category_name"`
+	Sku          string         `json:"sku"`
+	Name         string         `json:"name"`
+	Type         string         `json:"type"`
+	IsOpenPrice  bool           `json:"is_open_price"`
+	CurrentStock int32          `json:"current_stock"`
+	AverageCost  pgtype.Numeric `json:"average_cost"`
+	MinStock     int32          `json:"min_stock"`
+}
+
+func (q *Queries) ListPOSProducts(ctx context.Context) ([]ListPOSProductsRow, error) {
+	rows, err := q.db.Query(ctx, listPOSProducts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPOSProductsRow
+	for rows.Next() {
+		var i ListPOSProductsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CategoryID,
+			&i.CategoryName,
+			&i.Sku,
+			&i.Name,
+			&i.Type,
+			&i.IsOpenPrice,
+			&i.CurrentStock,
+			&i.AverageCost,
+			&i.MinStock,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProductStockLedger = `-- name: ListProductStockLedger :many
+SELECT 
+    il.id,
+    il.date,
+    il.transaction_type,
+    il.reference_id,
+    il.qty_change,
+    il.balance_after,
+    il.notes
+FROM inventory_ledgers il
+WHERE il.product_id = $1
+ORDER BY il.date DESC, il.id DESC
+LIMIT 200
+`
+
+type ListProductStockLedgerRow struct {
+	ID              int32              `json:"id"`
+	Date            pgtype.Timestamptz `json:"date"`
+	TransactionType string             `json:"transaction_type"`
+	ReferenceID     pgtype.Int4        `json:"reference_id"`
+	QtyChange       int32              `json:"qty_change"`
+	BalanceAfter    int32              `json:"balance_after"`
+	Notes           string             `json:"notes"`
+}
+
+func (q *Queries) ListProductStockLedger(ctx context.Context, productID int32) ([]ListProductStockLedgerRow, error) {
+	rows, err := q.db.Query(ctx, listProductStockLedger, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListProductStockLedgerRow
+	for rows.Next() {
+		var i ListProductStockLedgerRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Date,
+			&i.TransactionType,
+			&i.ReferenceID,
+			&i.QtyChange,
+			&i.BalanceAfter,
+			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPurchases = `-- name: ListPurchases :many
+SELECT 
+	pu.id,
+	pu.invoice_number,
+	pu.supplier_id,
+	COALESCE(s.name, 'Supplier Umum') AS supplier_name,
+	pu.payment_method,
+	pu.total_cost,
+	pu.status,
+	pu.notes,
+	pu.date,
+	pu.received_at
+FROM purchases pu
+LEFT JOIN suppliers s ON pu.supplier_id = s.id
+ORDER BY 
+	CASE WHEN pu.status = 'pending' THEN 0 ELSE 1 END ASC,
+	pu.id DESC
+`
+
+type ListPurchasesRow struct {
+	ID            int32              `json:"id"`
+	InvoiceNumber string             `json:"invoice_number"`
+	SupplierID    pgtype.Int4        `json:"supplier_id"`
+	SupplierName  string             `json:"supplier_name"`
+	PaymentMethod string             `json:"payment_method"`
+	TotalCost     pgtype.Numeric     `json:"total_cost"`
+	Status        string             `json:"status"`
+	Notes         string             `json:"notes"`
+	Date          pgtype.Timestamptz `json:"date"`
+	ReceivedAt    pgtype.Timestamptz `json:"received_at"`
+}
+
+func (q *Queries) ListPurchases(ctx context.Context) ([]ListPurchasesRow, error) {
+	rows, err := q.db.Query(ctx, listPurchases)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPurchasesRow
+	for rows.Next() {
+		var i ListPurchasesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.InvoiceNumber,
+			&i.SupplierID,
+			&i.SupplierName,
+			&i.PaymentMethod,
+			&i.TotalCost,
+			&i.Status,
+			&i.Notes,
+			&i.Date,
+			&i.ReceivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSales = `-- name: ListSales :many
+SELECT 
+	s.id,
+	s.invoice_no,
+	s.customer_id,
+	COALESCE(c.name, 'Pelanggan Umum') AS customer_name,
+	s.date,
+	s.total_amount,
+	s.discount_amount,
+	s.paid_amount,
+	s.change_amount,
+	s.payment_method,
+	s.payment_status,
+	s.due_date,
+	s.status,
+	s.notes,
+	s.created_at
+FROM sales s
+LEFT JOIN customers c ON s.customer_id = c.id
+ORDER BY s.id DESC
+`
+
+type ListSalesRow struct {
+	ID             int32              `json:"id"`
+	InvoiceNo      string             `json:"invoice_no"`
+	CustomerID     pgtype.Int4        `json:"customer_id"`
+	CustomerName   string             `json:"customer_name"`
+	Date           pgtype.Timestamptz `json:"date"`
+	TotalAmount    pgtype.Numeric     `json:"total_amount"`
+	DiscountAmount pgtype.Numeric     `json:"discount_amount"`
+	PaidAmount     pgtype.Numeric     `json:"paid_amount"`
+	ChangeAmount   pgtype.Numeric     `json:"change_amount"`
+	PaymentMethod  string             `json:"payment_method"`
+	PaymentStatus  string             `json:"payment_status"`
+	DueDate        pgtype.Date        `json:"due_date"`
+	Status         string             `json:"status"`
+	Notes          string             `json:"notes"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListSales(ctx context.Context) ([]ListSalesRow, error) {
+	rows, err := q.db.Query(ctx, listSales)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSalesRow
+	for rows.Next() {
+		var i ListSalesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.InvoiceNo,
+			&i.CustomerID,
+			&i.CustomerName,
+			&i.Date,
+			&i.TotalAmount,
+			&i.DiscountAmount,
+			&i.PaidAmount,
+			&i.ChangeAmount,
+			&i.PaymentMethod,
+			&i.PaymentStatus,
+			&i.DueDate,
+			&i.Status,
+			&i.Notes,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStockAdjustments = `-- name: ListStockAdjustments :many
+SELECT 
+    sa.id,
+    sa.adjustment_no,
+    sa.date,
+    sa.product_id,
+    p.sku AS product_sku,
+    p.name AS product_name,
+    c.name AS category_name,
+    pu.unit_name AS base_unit_name,
+    sa.system_stock,
+    sa.physical_stock,
+    sa.difference_qty,
+    sa.reason,
+    sa.notes,
+    sa.created_at
+FROM stock_adjustments sa
+JOIN products p ON sa.product_id = p.id
+LEFT JOIN categories c ON p.category_id = c.id
+LEFT JOIN product_units pu ON p.id = pu.product_id AND pu.conversion_qty = 1 AND pu.is_active = true
+WHERE ($1::text = '' OR p.name ILIKE $1 OR p.sku ILIKE $1 OR sa.adjustment_no ILIKE $1)
+  AND ($2::text = '' OR sa.reason = $2::text)
+  AND ($3::timestamptz IS NULL OR sa.date >= $3::timestamptz)
+  AND ($4::timestamptz IS NULL OR sa.date <= $4::timestamptz)
+ORDER BY sa.id DESC
+LIMIT $5 OFFSET $6
+`
+
+type ListStockAdjustmentsParams struct {
+	Column1 string             `json:"column_1"`
+	Column2 string             `json:"column_2"`
+	Column3 pgtype.Timestamptz `json:"column_3"`
+	Column4 pgtype.Timestamptz `json:"column_4"`
+	Limit   int32              `json:"limit"`
+	Offset  int32              `json:"offset"`
+}
+
+type ListStockAdjustmentsRow struct {
+	ID            int32              `json:"id"`
+	AdjustmentNo  string             `json:"adjustment_no"`
+	Date          pgtype.Timestamptz `json:"date"`
+	ProductID     int32              `json:"product_id"`
+	ProductSku    string             `json:"product_sku"`
+	ProductName   string             `json:"product_name"`
+	CategoryName  pgtype.Text        `json:"category_name"`
+	BaseUnitName  pgtype.Text        `json:"base_unit_name"`
+	SystemStock   int32              `json:"system_stock"`
+	PhysicalStock int32              `json:"physical_stock"`
+	DifferenceQty int32              `json:"difference_qty"`
+	Reason        string             `json:"reason"`
+	Notes         string             `json:"notes"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListStockAdjustments(ctx context.Context, arg ListStockAdjustmentsParams) ([]ListStockAdjustmentsRow, error) {
+	rows, err := q.db.Query(ctx, listStockAdjustments,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListStockAdjustmentsRow
+	for rows.Next() {
+		var i ListStockAdjustmentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AdjustmentNo,
+			&i.Date,
+			&i.ProductID,
+			&i.ProductSku,
+			&i.ProductName,
+			&i.CategoryName,
+			&i.BaseUnitName,
+			&i.SystemStock,
+			&i.PhysicalStock,
+			&i.DifferenceQty,
+			&i.Reason,
+			&i.Notes,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSuppliers = `-- name: ListSuppliers :many
+SELECT id, name, phone, address, is_active, created_at, updated_at FROM suppliers
+WHERE is_active = true
+ORDER BY name ASC
+`
+
+func (q *Queries) ListSuppliers(ctx context.Context) ([]Supplier, error) {
+	rows, err := q.db.Query(ctx, listSuppliers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Supplier
+	for rows.Next() {
+		var i Supplier
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Phone,
+			&i.Address,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUsers = `-- name: ListUsers :many
+SELECT id, username, name, password_hash, role, is_active, created_at, updated_at FROM users
+ORDER BY role ASC, username ASC
+`
+
+func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.Query(ctx, listUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.Name,
+			&i.PasswordHash,
+			&i.Role,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const reopenPurchaseOrder = `-- name: ReopenPurchaseOrder :exec
+UPDATE purchases
+SET status = 'pending', received_at = NULL, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1 AND status = 'batal'
+`
+
+func (q *Queries) ReopenPurchaseOrder(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, reopenPurchaseOrder, id)
+	return err
+}
+
+const restoreCustomer = `-- name: RestoreCustomer :exec
+UPDATE customers
+SET is_active = true, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+func (q *Queries) RestoreCustomer(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, restoreCustomer, id)
+	return err
+}
+
+const searchProducts = `-- name: SearchProducts :many
+SELECT 
+	p.id AS product_id,
+	c.name AS category_name,
+	p.sku,
+	p.name AS product_name,
+	p.type,
+	p.current_stock,
+	p.min_stock,
+	p.average_cost,
+	pu.unit_name,
+	pu.conversion_qty,
+	pu.price
+FROM products p
+LEFT JOIN categories c ON p.category_id = c.id
+LEFT JOIN product_units pu ON p.id = pu.product_id AND pu.conversion_qty = 1 AND pu.is_active = true
+WHERE p.is_active = true
+  AND (p.name ILIKE $1 OR p.sku ILIKE $1)
+  AND ($2::int = 0 OR p.category_id = $2::int)
+  AND ($3::text = '' OR p.type = $3::text)
+  AND (
+    $4::text = '' OR
+    ($4::text = 'low_stock' AND p.type = 'barang' AND p.current_stock <= p.min_stock) OR
+    ($4::text = 'out_of_stock' AND p.type = 'barang' AND p.current_stock <= 0) OR
+    ($4::text = 'in_stock' AND (p.type != 'barang' OR p.current_stock > p.min_stock)) OR
+    ($4::text = 'no_hpp' AND p.type = 'barang' AND COALESCE(p.average_cost, 0) <= 0)
+  )
+ORDER BY
+  CASE WHEN $5::text = 'name_asc' THEN LOWER(p.name) END ASC,
+  CASE WHEN $5::text = 'name_desc' THEN LOWER(p.name) END DESC,
+  CASE WHEN $5::text = 'stock_asc' THEN p.current_stock END ASC,
+  CASE WHEN $5::text = 'stock_desc' THEN p.current_stock END DESC,
+  CASE WHEN $5::text = 'price_asc' THEN COALESCE(pu.price, 0) END ASC,
+  CASE WHEN $5::text = 'price_desc' THEN COALESCE(pu.price, 0) END DESC,
+  p.id DESC
+LIMIT $6 OFFSET $7
+`
+
+type SearchProductsParams struct {
+	Name    string `json:"name"`
+	Column2 int32  `json:"column_2"`
+	Column3 string `json:"column_3"`
+	Column4 string `json:"column_4"`
+	Column5 string `json:"column_5"`
+	Limit   int32  `json:"limit"`
+	Offset  int32  `json:"offset"`
+}
+
+type SearchProductsRow struct {
+	ProductID     int32          `json:"product_id"`
+	CategoryName  pgtype.Text    `json:"category_name"`
+	Sku           string         `json:"sku"`
+	ProductName   string         `json:"product_name"`
+	Type          string         `json:"type"`
+	CurrentStock  int32          `json:"current_stock"`
+	MinStock      int32          `json:"min_stock"`
+	AverageCost   pgtype.Numeric `json:"average_cost"`
+	UnitName      pgtype.Text    `json:"unit_name"`
+	ConversionQty pgtype.Int4    `json:"conversion_qty"`
+	Price         pgtype.Numeric `json:"price"`
+}
+
+func (q *Queries) SearchProducts(ctx context.Context, arg SearchProductsParams) ([]SearchProductsRow, error) {
+	rows, err := q.db.Query(ctx, searchProducts,
+		arg.Name,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchProductsRow
+	for rows.Next() {
+		var i SearchProductsRow
+		if err := rows.Scan(
+			&i.ProductID,
+			&i.CategoryName,
+			&i.Sku,
+			&i.ProductName,
+			&i.Type,
+			&i.CurrentStock,
+			&i.MinStock,
+			&i.AverageCost,
+			&i.UnitName,
+			&i.ConversionQty,
+			&i.Price,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateCategory = `-- name: UpdateCategory :exec
 UPDATE categories
 SET code = $2, name = $3, updated_at = CURRENT_TIMESTAMP
@@ -113,5 +3240,296 @@ type UpdateCategoryParams struct {
 
 func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) error {
 	_, err := q.db.Exec(ctx, updateCategory, arg.ID, arg.Code, arg.Name)
+	return err
+}
+
+const updateCompanyConfig = `-- name: UpdateCompanyConfig :exec
+UPDATE company_configs
+SET 
+	name = $1,
+	tagline = $2,
+	phone = $3,
+	address = $4,
+	receipt_footer = $5,
+	updated_at = CURRENT_TIMESTAMP
+WHERE id = 1
+`
+
+type UpdateCompanyConfigParams struct {
+	Name          string `json:"name"`
+	Tagline       string `json:"tagline"`
+	Phone         string `json:"phone"`
+	Address       string `json:"address"`
+	ReceiptFooter string `json:"receipt_footer"`
+}
+
+func (q *Queries) UpdateCompanyConfig(ctx context.Context, arg UpdateCompanyConfigParams) error {
+	_, err := q.db.Exec(ctx, updateCompanyConfig,
+		arg.Name,
+		arg.Tagline,
+		arg.Phone,
+		arg.Address,
+		arg.ReceiptFooter,
+	)
+	return err
+}
+
+const updateCustomer = `-- name: UpdateCustomer :exec
+UPDATE customers
+SET name = $2, phone = $3, address = $4, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+type UpdateCustomerParams struct {
+	ID      int32       `json:"id"`
+	Name    string      `json:"name"`
+	Phone   pgtype.Text `json:"phone"`
+	Address pgtype.Text `json:"address"`
+}
+
+func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) error {
+	_, err := q.db.Exec(ctx, updateCustomer,
+		arg.ID,
+		arg.Name,
+		arg.Phone,
+		arg.Address,
+	)
+	return err
+}
+
+const updateExistingProductUnit = `-- name: UpdateExistingProductUnit :one
+UPDATE product_units
+SET 
+	unit_name = $2,
+	conversion_qty = $3,
+	price = $4,
+	is_active = true,
+	updated_at = CURRENT_TIMESTAMP
+WHERE id = (
+	SELECT pu.id FROM product_units pu
+	WHERE pu.product_id = $1 AND LOWER(pu.unit_name) = LOWER($2)
+	LIMIT 1
+)
+RETURNING id
+`
+
+type UpdateExistingProductUnitParams struct {
+	ProductID     int32          `json:"product_id"`
+	UnitName      string         `json:"unit_name"`
+	ConversionQty int32          `json:"conversion_qty"`
+	Price         pgtype.Numeric `json:"price"`
+}
+
+func (q *Queries) UpdateExistingProductUnit(ctx context.Context, arg UpdateExistingProductUnitParams) (int32, error) {
+	row := q.db.QueryRow(ctx, updateExistingProductUnit,
+		arg.ProductID,
+		arg.UnitName,
+		arg.ConversionQty,
+		arg.Price,
+	)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
+const updateProduct = `-- name: UpdateProduct :exec
+UPDATE products
+SET 
+	category_id = $2,
+	sku = $3,
+	name = $4,
+	type = $5,
+	is_open_price = $6,
+	min_stock = $7,
+	average_cost = $8,
+	updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+type UpdateProductParams struct {
+	ID          int32          `json:"id"`
+	CategoryID  int32          `json:"category_id"`
+	Sku         string         `json:"sku"`
+	Name        string         `json:"name"`
+	Type        string         `json:"type"`
+	IsOpenPrice bool           `json:"is_open_price"`
+	MinStock    int32          `json:"min_stock"`
+	AverageCost pgtype.Numeric `json:"average_cost"`
+}
+
+func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) error {
+	_, err := q.db.Exec(ctx, updateProduct,
+		arg.ID,
+		arg.CategoryID,
+		arg.Sku,
+		arg.Name,
+		arg.Type,
+		arg.IsOpenPrice,
+		arg.MinStock,
+		arg.AverageCost,
+	)
+	return err
+}
+
+const updateProductStockAndCost = `-- name: UpdateProductStockAndCost :exec
+UPDATE products
+SET 
+	current_stock = $2,
+	average_cost = $3,
+	updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+type UpdateProductStockAndCostParams struct {
+	ID           int32          `json:"id"`
+	CurrentStock int32          `json:"current_stock"`
+	AverageCost  pgtype.Numeric `json:"average_cost"`
+}
+
+func (q *Queries) UpdateProductStockAndCost(ctx context.Context, arg UpdateProductStockAndCostParams) error {
+	_, err := q.db.Exec(ctx, updateProductStockAndCost, arg.ID, arg.CurrentStock, arg.AverageCost)
+	return err
+}
+
+const updatePurchaseDetailOnReceive = `-- name: UpdatePurchaseDetailOnReceive :exec
+UPDATE purchase_details
+SET qty = $2, cost = $3, subtotal = $4
+WHERE id = $1
+`
+
+type UpdatePurchaseDetailOnReceiveParams struct {
+	ID       int32          `json:"id"`
+	Qty      int32          `json:"qty"`
+	Cost     pgtype.Numeric `json:"cost"`
+	Subtotal pgtype.Numeric `json:"subtotal"`
+}
+
+func (q *Queries) UpdatePurchaseDetailOnReceive(ctx context.Context, arg UpdatePurchaseDetailOnReceiveParams) error {
+	_, err := q.db.Exec(ctx, updatePurchaseDetailOnReceive,
+		arg.ID,
+		arg.Qty,
+		arg.Cost,
+		arg.Subtotal,
+	)
+	return err
+}
+
+const updatePurchaseOnReceive = `-- name: UpdatePurchaseOnReceive :exec
+UPDATE purchases
+SET 
+	status = 'diterima',
+	payment_method = $2,
+	total_cost = $3,
+	notes = $4,
+	received_at = CURRENT_TIMESTAMP,
+	updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+type UpdatePurchaseOnReceiveParams struct {
+	ID            int32          `json:"id"`
+	PaymentMethod string         `json:"payment_method"`
+	TotalCost     pgtype.Numeric `json:"total_cost"`
+	Notes         string         `json:"notes"`
+}
+
+func (q *Queries) UpdatePurchaseOnReceive(ctx context.Context, arg UpdatePurchaseOnReceiveParams) error {
+	_, err := q.db.Exec(ctx, updatePurchaseOnReceive,
+		arg.ID,
+		arg.PaymentMethod,
+		arg.TotalCost,
+		arg.Notes,
+	)
+	return err
+}
+
+const updateSupplier = `-- name: UpdateSupplier :exec
+UPDATE suppliers
+SET name = $2, phone = $3, address = $4, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+type UpdateSupplierParams struct {
+	ID      int32       `json:"id"`
+	Name    string      `json:"name"`
+	Phone   pgtype.Text `json:"phone"`
+	Address pgtype.Text `json:"address"`
+}
+
+func (q *Queries) UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) error {
+	_, err := q.db.Exec(ctx, updateSupplier,
+		arg.ID,
+		arg.Name,
+		arg.Phone,
+		arg.Address,
+	)
+	return err
+}
+
+const updateUser = `-- name: UpdateUser :exec
+UPDATE users
+SET username = $2,
+    name = $3,
+    role = $4,
+    is_active = $5,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+type UpdateUserParams struct {
+	ID       int32  `json:"id"`
+	Username string `json:"username"`
+	Name     string `json:"name"`
+	Role     string `json:"role"`
+	IsActive bool   `json:"is_active"`
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
+	_, err := q.db.Exec(ctx, updateUser,
+		arg.ID,
+		arg.Username,
+		arg.Name,
+		arg.Role,
+		arg.IsActive,
+	)
+	return err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :exec
+UPDATE users
+SET password_hash = $2,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+type UpdateUserPasswordParams struct {
+	ID           int32  `json:"id"`
+	PasswordHash string `json:"password_hash"`
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
+	_, err := q.db.Exec(ctx, updateUserPassword, arg.ID, arg.PasswordHash)
+	return err
+}
+
+const voidGoodsReceipt = `-- name: VoidGoodsReceipt :exec
+UPDATE purchases
+SET status = 'batal', updated_at = CURRENT_TIMESTAMP
+WHERE id = $1 AND status = 'diterima'
+`
+
+func (q *Queries) VoidGoodsReceipt(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, voidGoodsReceipt, id)
+	return err
+}
+
+const voidSale = `-- name: VoidSale :exec
+UPDATE sales
+SET status = 'batal', updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+func (q *Queries) VoidSale(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, voidSale, id)
 	return err
 }

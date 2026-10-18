@@ -1,0 +1,303 @@
+package auth
+
+import (
+	"fmt"
+
+	repo "github.com/ELghazX/pos-toko-ubaidillah/internal/adapters/postgresql/sqlc"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/views"
+)
+
+templ LoginPage(errorMsg string, username string) {
+	<!DOCTYPE html>
+	<html lang="id">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>Masuk - ELghazPOS</title>
+			<link href="/css/style.css" rel="stylesheet"/>
+			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+			<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+			<style>
+				[x-cloak] { display: none !important; }
+				body {
+					font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+				}
+			</style>
+		</head>
+		<body class="bg-[#F5F5F7] text-[#1D1D1F] antialiased min-h-[100dvh] flex items-center justify-center p-4">
+			<div class="w-full max-w-md">
+				<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] p-6 sm:p-8">
+					<div class="text-center mb-6">
+						<div class="w-12 h-12 rounded-2xl bg-[#007AFF]/10 text-[#007AFF] inline-flex items-center justify-center mb-3">
+							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+							</svg>
+						</div>
+						<h1 class="text-2xl font-bold text-[#1D1D1F] tracking-tight">ELghazPOS</h1>
+						<p class="text-sm text-[#8E8E93] mt-1">Masuk untuk mengakses sistem kasir & manajemen toko</p>
+					</div>
+
+					if errorMsg != "" {
+						<div class="mb-5 p-3.5 rounded-xl bg-[#FF3B30]/10 border border-[#FF3B30]/20 text-[#FF3B30] text-sm font-medium flex items-center gap-2.5">
+							<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+							</svg>
+							<span>{ errorMsg }</span>
+						</div>
+					}
+
+					<form action="/login" method="POST" class="space-y-4" x-data="{ showPassword: false }">
+						<div>
+							<label for="username" class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Username</label>
+							<input
+								id="username"
+								name="username"
+								type="text"
+								value={ username }
+								required
+								autofocus
+								autocomplete="username"
+								placeholder="Masukkan username"
+								class="w-full min-h-[44px] px-4 rounded-xl bg-[#F5F5F7] border border-transparent text-[#1D1D1F] text-sm focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 outline-none transition"
+							/>
+						</div>
+
+						<div>
+							<label for="password" class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Password</label>
+							<div class="relative">
+								<input
+									id="password"
+									name="password"
+									:type="showPassword ? 'text' : 'password'"
+									required
+									autocomplete="current-password"
+									placeholder="Masukkan password"
+									class="w-full min-h-[44px] pl-4 pr-11 rounded-xl bg-[#F5F5F7] border border-transparent text-[#1D1D1F] text-sm focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 outline-none transition"
+								/>
+								<button
+									type="button"
+									@click="showPassword = !showPassword"
+									class="absolute right-1.5 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#1D1D1F] rounded-lg transition"
+									tabindex="-1"
+								>
+									<svg x-show="!showPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+									</svg>
+									<svg x-show="showPassword" x-cloak class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
+									</svg>
+								</button>
+							</div>
+						</div>
+
+						<div class="pt-2">
+							<button
+								type="submit"
+								class="w-full min-h-[48px] bg-[#007AFF] hover:bg-[#0066D6] text-white font-semibold rounded-xl shadow-xs transition cursor-pointer"
+							>
+								Masuk
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</body>
+	</html>
+}
+
+templ UsersPage(users []repo.User, successMsg string, errorMsg string) {
+	@views.Base("Manajemen Akun", "users") {
+		<div
+			class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6"
+			x-data="{
+				showAddModal: false,
+				showEditModal: false,
+				editId: 0,
+				editUsername: '',
+				editName: '',
+				editRole: 'kasir',
+				editActive: true,
+				openEdit(id, username, name, role, active) {
+					this.editId = id;
+					this.editUsername = username;
+					this.editName = name;
+					this.editRole = role;
+					this.editActive = active;
+					this.showEditModal = true;
+				}
+			}"
+		>
+			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+				<div>
+					<h1 class="text-2xl font-bold text-[#1D1D1F] tracking-tight">Manajemen Akun Pengguna</h1>
+					<p class="text-sm text-[#8E8E93] mt-1">Kelola akun Admin (akses penuh) dan Kasir (akses bagian Kasir & Penjualan).</p>
+				</div>
+				<button
+					type="button"
+					@click="showAddModal = true"
+					class="min-h-[44px] px-4 rounded-xl bg-[#007AFF] hover:bg-[#0066D6] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
+				>
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+					</svg>
+					<span>Tambah Pengguna</span>
+				</button>
+			</div>
+
+			if successMsg != "" {
+				<div class="p-4 rounded-2xl bg-[#34C759]/10 border border-[#34C759]/20 text-[#248A3D] text-sm font-medium flex items-center gap-3">
+					<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+					</svg>
+					<span>{ successMsg }</span>
+				</div>
+			}
+
+			if errorMsg != "" {
+				<div class="p-4 rounded-2xl bg-[#FF3B30]/10 border border-[#FF3B30]/20 text-[#FF3B30] text-sm font-medium flex items-center gap-3">
+					<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+					</svg>
+					<span>{ errorMsg }</span>
+				</div>
+			}
+
+			<div class="bg-white rounded-2xl shadow-xs border border-[#E5E5EA] overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="w-full text-left border-collapse">
+						<thead>
+							<tr class="border-b border-[#E5E5EA] text-xs font-semibold text-[#8E8E93] uppercase tracking-wider bg-[#F5F5F7]/60">
+								<th class="py-3.5 px-5">Nama Pengguna</th>
+								<th class="py-3.5 px-5">Username</th>
+								<th class="py-3.5 px-5">Peran (Role)</th>
+								<th class="py-3.5 px-5">Hak Akses</th>
+								<th class="py-3.5 px-5">Status</th>
+								<th class="py-3.5 px-5 text-right">Aksi</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-[#E5E5EA] text-sm">
+							for _, u := range users {
+								<tr class="hover:bg-[#F5F5F7]/50 transition">
+									<td class="py-3.5 px-5 font-semibold text-[#1D1D1F]">{ u.Name }</td>
+									<td class="py-3.5 px-5 font-mono text-xs text-[#1D1D1F]">{ "@" + u.Username }</td>
+									<td class="py-3.5 px-5">
+										if u.Role == RoleAdmin {
+											<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-[#007AFF]/15 text-[#007AFF]">Admin</span>
+										} else {
+											<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-[#34C759]/15 text-[#248A3D]">Kasir</span>
+										}
+									</td>
+									<td class="py-3.5 px-5 text-xs text-[#8E8E93]">
+										if u.Role == RoleAdmin {
+											Semua menu & pengaturan sistem
+										} else {
+											Bagian Kasir & Penjualan (POS, Riwayat, Kasbon, Pelanggan)
+										}
+									</td>
+									<td class="py-3.5 px-5">
+										if u.IsActive {
+											<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-[#34C759]/15 text-[#248A3D]">Aktif</span>
+										} else {
+											<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-[#8E8E93]/15 text-[#8E8E93]">Nonaktif</span>
+										}
+									</td>
+									<td class="py-3.5 px-5 text-right">
+										<button
+											type="button"
+											data-id={ fmt.Sprint(u.ID) }
+											data-username={ u.Username }
+											data-name={ u.Name }
+											data-role={ u.Role }
+											data-active={ fmt.Sprint(u.IsActive) }
+											@click="openEdit(parseInt($el.dataset.id), $el.dataset.username, $el.dataset.name, $el.dataset.role, $el.dataset.active === 'true')"
+											class="min-h-[36px] px-3 rounded-xl bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
+										>
+											Ubah / Reset Password
+										</button>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+
+			<div x-show="showAddModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+				<div @click.away="showAddModal = false" class="bg-white rounded-2xl shadow-xl border border-[#E5E5EA] w-full max-w-md p-6">
+					<div class="flex items-center justify-between mb-5">
+						<h3 class="text-lg font-bold text-[#1D1D1F]">Tambah Pengguna Baru</h3>
+						<button type="button" @click="showAddModal = false" class="min-w-[36px] min-h-[36px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#1D1D1F] rounded-xl hover:bg-black/5">
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<form action="/settings/users" method="POST" hx-boost="false" class="space-y-4">
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Nama Lengkap <span class="text-[#FF3B30]">*</span></label>
+							<input type="text" name="name" required placeholder="Contoh: Budi Santoso" class="w-full min-h-[44px] px-4 rounded-xl bg-[#F5F5F7] border border-transparent text-sm focus:bg-white focus:border-[#007AFF] outline-none transition"/>
+						</div>
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Username <span class="text-[#FF3B30]">*</span></label>
+							<input type="text" name="username" required placeholder="Contoh: kasir2" class="w-full min-h-[44px] px-4 rounded-xl bg-[#F5F5F7] border border-transparent text-sm focus:bg-white focus:border-[#007AFF] outline-none transition"/>
+						</div>
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Peran (Role) <span class="text-[#FF3B30]">*</span></label>
+							<select name="role" class="w-full min-h-[44px] px-4 rounded-xl bg-[#F5F5F7] border border-transparent text-sm focus:bg-white focus:border-[#007AFF] outline-none transition">
+								<option value="kasir">Kasir (Hanya Kasir & Penjualan)</option>
+								<option value="admin">Admin (Akses Penuh)</option>
+							</select>
+						</div>
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Password <span class="text-[#FF3B30]">*</span></label>
+							<input type="password" name="password" required minlength="4" placeholder="Minimal 4 karakter" class="w-full min-h-[44px] px-4 rounded-xl bg-[#F5F5F7] border border-transparent text-sm focus:bg-white focus:border-[#007AFF] outline-none transition"/>
+						</div>
+						<div class="flex items-center justify-end gap-2 pt-3">
+							<button type="button" @click="showAddModal = false" class="min-h-[44px] px-4 rounded-xl bg-[#E5E5EA]/70 text-[#1D1D1F] text-sm font-medium hover:bg-[#E5E5EA] transition cursor-pointer">Batal</button>
+							<button type="submit" class="min-h-[44px] px-5 rounded-xl bg-[#007AFF] text-white text-sm font-semibold hover:bg-[#0066D6] transition cursor-pointer">Simpan Pengguna</button>
+						</div>
+					</form>
+				</div>
+			</div>
+
+			<div x-show="showEditModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+				<div @click.away="showEditModal = false" class="bg-white rounded-2xl shadow-xl border border-[#E5E5EA] w-full max-w-md p-6">
+					<div class="flex items-center justify-between mb-5">
+						<h3 class="text-lg font-bold text-[#1D1D1F]">Ubah Akun Pengguna</h3>
+						<button type="button" @click="showEditModal = false" class="min-w-[36px] min-h-[36px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#1D1D1F] rounded-xl hover:bg-black/5">
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<form :action="'/settings/users/' + editId + '/update'" method="POST" hx-boost="false" class="space-y-4">
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Nama Lengkap <span class="text-[#FF3B30]">*</span></label>
+							<input type="text" name="name" x-model="editName" required class="w-full min-h-[44px] px-4 rounded-xl bg-[#F5F5F7] border border-transparent text-sm focus:bg-white focus:border-[#007AFF] outline-none transition"/>
+						</div>
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Username <span class="text-[#FF3B30]">*</span></label>
+							<input type="text" name="username" x-model="editUsername" required class="w-full min-h-[44px] px-4 rounded-xl bg-[#F5F5F7] border border-transparent text-sm focus:bg-white focus:border-[#007AFF] outline-none transition"/>
+						</div>
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Peran (Role) <span class="text-[#FF3B30]">*</span></label>
+							<select name="role" x-model="editRole" class="w-full min-h-[44px] px-4 rounded-xl bg-[#F5F5F7] border border-transparent text-sm focus:bg-white focus:border-[#007AFF] outline-none transition">
+								<option value="kasir">Kasir (Hanya Kasir & Penjualan)</option>
+								<option value="admin">Admin (Akses Penuh)</option>
+							</select>
+						</div>
+						<div>
+							<label class="block text-sm font-medium text-[#1D1D1F] mb-1.5">Password Baru (Opsional)</label>
+							<input type="password" name="password" placeholder="Kosongkan jika tidak ingin mengganti password" class="w-full min-h-[44px] px-4 rounded-xl bg-[#F5F5F7] border border-transparent text-sm focus:bg-white focus:border-[#007AFF] outline-none transition"/>
+						</div>
+						<div class="flex items-center justify-between p-3 rounded-xl bg-[#F5F5F7]">
+							<span class="text-sm font-medium text-[#1D1D1F]">Status Akun Aktif</span>
+							<input type="checkbox" name="is_active" value="true" x-model="editActive" class="w-5 h-5 accent-[#007AFF] rounded cursor-pointer"/>
+						</div>
+						<div class="flex items-center justify-end gap-2 pt-3">
+							<button type="button" @click="showEditModal = false" class="min-h-[44px] px-4 rounded-xl bg-[#E5E5EA]/70 text-[#1D1D1F] text-sm font-medium hover:bg-[#E5E5EA] transition cursor-pointer">Batal</button>
+							<button type="submit" class="min-h-[44px] px-5 rounded-xl bg-[#007AFF] text-white text-sm font-semibold hover:bg-[#0066D6] transition cursor-pointer">Simpan Perubahan</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	}
+}

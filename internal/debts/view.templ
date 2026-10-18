@@ -1,0 +1,990 @@
+package debts
+
+import (
+	"fmt"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/utils"
+	"github.com/ELghazX/pos-toko-ubaidillah/internal/views"
+)
+
+templ DebtsPage(data *DebtsPageData) {
+	@views.Base("Buku Rekap Kasbon Pelanggan", "debts") {
+		<div
+			class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6"
+			x-data={ fmt.Sprintf(`{
+				activeTab: '%s',
+				showPayModal: false,
+				payType: 'customer',
+				payTargetId: 0,
+				payTargetName: '',
+				payRemaining: 0,
+				payAmount: '',
+				payNotes: '',
+				paySubmitting: false,
+				payError: '',
+				showDetailModal: false,
+				detailLoading: false,
+				detailData: null,
+				showWaModal: false,
+				waCustomerId: 0,
+				waCustomerName: '',
+				waPhone: '',
+				waPreview: '',
+				waConnected: false,
+				waLoadingDraft: false,
+				waSending: false,
+				waSuccess: '',
+				waError: '',
+
+				openPayCustomer(id, name, remaining) {
+					this.payType = 'customer';
+					this.payTargetId = id;
+					this.payTargetName = name;
+					this.payRemaining = remaining;
+					this.payAmount = '';
+					this.payNotes = '';
+					this.payError = '';
+					this.paySubmitting = false;
+					this.showPayModal = true;
+				},
+
+				openPaySale(id, invoiceNo, remaining) {
+					this.payType = 'sale';
+					this.payTargetId = id;
+					this.payTargetName = 'Nota #' + invoiceNo;
+					this.payRemaining = remaining;
+					this.payAmount = '';
+					this.payNotes = '';
+					this.payError = '';
+					this.paySubmitting = false;
+					this.showPayModal = true;
+				},
+
+				async submitPayment() {
+					let amount = parseFloat(this.payAmount);
+					if (!amount || amount <= 0) {
+						this.payError = 'Nominal pembayaran harus lebih besar dari 0.';
+						return;
+					}
+					if (amount > parseFloat(this.payRemaining)) {
+						this.payError = 'Nominal pembayaran melebihi sisa piutang (Maks: Rp ' + Number(this.payRemaining).toLocaleString('id-ID') + ').';
+						return;
+					}
+
+					this.paySubmitting = true;
+					this.payError = '';
+
+					try {
+						let url = this.payType === 'customer'
+							? ('/debts/customer/' + this.payTargetId + '/pay')
+							: '/debts/pay-sale';
+
+						let formData = new FormData();
+						if (this.payType === 'sale') {
+							formData.append('sale_id', String(this.payTargetId));
+						}
+						formData.append('amount', String(amount));
+						formData.append('notes', this.payNotes || '');
+						formData.append('tab', this.activeTab);
+
+						let res = await fetch(url, {
+							method: 'POST',
+							headers: { 'Accept': 'application/json' },
+							body: formData
+						});
+
+						let result = await res.json().catch(() => null);
+						if (res.ok && (!result || result.success)) {
+							alert('Pembayaran kasbon berhasil dicatat!');
+							this.showPayModal = false;
+							window.location.href = '/debts?tab=' + this.activeTab;
+						} else {
+							this.payError = (result && result.error) ? result.error : 'Gagal mencatat pembayaran kasbon.';
+						}
+					} catch (e) {
+						console.error(e);
+						this.payError = 'Terjadi kesalahan jaringan saat mengirim pembayaran.';
+					} finally {
+						this.paySubmitting = false;
+					}
+				},
+
+				async openCustomerDetail(id) {
+					this.detailLoading = true;
+					this.showDetailModal = true;
+					this.detailData = null;
+					try {
+						let res = await fetch('/debts/customer/' + id);
+						if (res.ok) {
+							this.detailData = await res.json();
+						} else {
+							alert('Gagal memuat detail piutang pelanggan.');
+							this.showDetailModal = false;
+						}
+					} catch(e) {
+						console.error(e);
+						alert('Terjadi kesalahan koneksi.');
+						this.showDetailModal = false;
+					} finally {
+						this.detailLoading = false;
+					}
+				},
+
+				isCustomerInactive(c) {
+					if (!c) return false;
+					if (c.is_active && c.is_active.Valid !== undefined) {
+						return !c.is_active.Bool;
+					}
+					return c.is_active === false;
+				},
+
+				async restoreCustomer(id) {
+					if (!confirm('Aktifkan kembali pelanggan ini ke master data aktif?')) return;
+					try {
+						let res = await fetch('/customers/' + id + '/restore', {
+							method: 'POST',
+							headers: { 'Accept': 'application/json' }
+						});
+						if (res.ok) {
+							alert('Pelanggan berhasil diaktifkan kembali!');
+							window.location.reload();
+						} else {
+							let text = await res.text();
+							alert('Gagal mengaktifkan kembali pelanggan: ' + text);
+						}
+					} catch(e) {
+						console.error(e);
+						alert('Terjadi kesalahan koneksi.');
+					}
+				},
+
+				async openWaReminder(id, name, phone) {
+					this.waCustomerId = id;
+					this.waCustomerName = name;
+					this.waPhone = phone || '';
+					this.waPreview = '';
+					this.waConnected = false;
+					this.waSuccess = '';
+					this.waError = '';
+					this.showWaModal = true;
+					await this.loadWaDraft();
+				},
+
+				async loadWaDraft() {
+					this.waLoadingDraft = true;
+					this.waError = '';
+					this.waSuccess = '';
+					try {
+						let qPhone = encodeURIComponent(this.waPhone || '');
+						let res = await fetch('/debts/customer/' + this.waCustomerId + '/draft-wa?phone=' + qPhone);
+						let result = await res.json().catch(() => null);
+						if (res.ok && result && result.success) {
+							this.waPreview = result.message;
+							if (result.phone && !this.waPhone) {
+								this.waPhone = result.phone;
+							}
+							this.waConnected = !!result.wa_connected;
+						} else {
+							this.waError = (result && result.error) ? result.error : 'Gagal memuat draf pesan tagihan.';
+						}
+					} catch(e) {
+						console.error(e);
+						this.waError = 'Terjadi kesalahan sistem saat memuat draf pesan.';
+					} finally {
+						this.waLoadingDraft = false;
+					}
+				},
+
+				async sendWaViaWhatsmeow() {
+					if (!this.waPhone) {
+						this.waError = 'Nomor WhatsApp tujuan wajib diisi.';
+						return;
+					}
+					if (!this.waConnected) {
+						this.waError = 'WhatsApp belum terhubung. Silakan buka menu Pengaturan untuk memindai QR code WhatsApp toko terlebih dahulu.';
+						return;
+					}
+
+					this.waSending = true;
+					this.waError = '';
+					this.waSuccess = '';
+
+					try {
+						let formData = new FormData();
+						formData.append('phone', this.waPhone);
+						formData.append('message', this.waPreview);
+
+						let res = await fetch('/debts/customer/' + this.waCustomerId + '/send-wa', {
+							method: 'POST',
+							headers: { 'Accept': 'application/json' },
+							body: formData
+						});
+
+						let result = await res.json().catch(() => null);
+						if (res.ok && result && result.success) {
+							this.waSuccess = result.message || 'Pesan tagihan berhasil dikirim via WhatsApp (Whatsmeow)!';
+						} else {
+							this.waError = (result && result.error) ? result.error : 'Gagal mengirim tagihan via WhatsApp.';
+						}
+					} catch(e) {
+						console.error(e);
+						this.waError = 'Terjadi kesalahan jaringan saat mengirim pesan.';
+					} finally {
+						this.waSending = false;
+					}
+				}
+			}`, data.ActiveTab) }
+		>
+			<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
+				<div>
+					<h1 class="text-3xl font-bold text-[#1D1D1F] tracking-tight">Buku Rekap Kasbon Pelanggan</h1>
+					<p class="text-sm text-[#8E8E93] mt-1">Pantau saldo utang pelanggan toko, catat cicilan pelunasan, dan kirim tagihan via WhatsApp</p>
+				</div>
+				<div class="flex items-center gap-3 w-full sm:w-auto">
+					<a
+						href="/pos"
+						class="bg-[#007AFF] hover:bg-[#0066D6] text-white px-5 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition shadow-xs w-full sm:w-auto"
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"></path></svg>
+						<span>Layar Kasir</span>
+					</a>
+				</div>
+			</div>
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+				<div class="bg-white rounded-2xl border border-[#E5E5EA] p-5 shadow-xs flex flex-col justify-between">
+					<div class="flex items-center justify-between">
+						<span class="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider">Total Piutang Belum Lunas</span>
+						<div class="w-9 h-9 rounded-xl bg-[#F5F5F7] flex items-center justify-center text-[#1D1D1F]">
+							<svg class="w-5 h-5 text-[#8E8E93]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z"></path></svg>
+						</div>
+					</div>
+					<div class="mt-4">
+						<div class="text-2xl font-bold text-[#1D1D1F] tracking-tight tabular-nums">
+							Rp { utils.FormatRupiah(utils.FloatToNumeric(data.Summary.TotalOutstanding)) }
+						</div>
+						<span class="text-xs text-[#8E8E93] mt-1.5 block">Saldo kasbon yang belum lunas</span>
+					</div>
+				</div>
+				<div class="bg-white rounded-2xl border border-[#E5E5EA] p-5 shadow-xs flex flex-col justify-between">
+					<div class="flex items-center justify-between">
+						<span class="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider">Pelanggan Memiliki Kasbon</span>
+						<div class="w-9 h-9 rounded-xl bg-[#F5F5F7] flex items-center justify-center text-[#1D1D1F]">
+							<svg class="w-5 h-5 text-[#8E8E93]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.999-3.199a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"></path></svg>
+						</div>
+					</div>
+					<div class="mt-4">
+						<div class="text-2xl font-bold text-[#1D1D1F] tracking-tight tabular-nums">
+							{ fmt.Sprint(data.Summary.TotalCustomersInDebt) } Orang
+						</div>
+						<span class="text-xs text-[#8E8E93] mt-1.5 block">Total orang yang memiliki saldo piutang</span>
+					</div>
+				</div>
+				<div class="bg-white rounded-2xl border border-[#E5E5EA] p-5 shadow-xs flex flex-col justify-between">
+					<div class="flex items-center justify-between">
+						<span class="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider">Kasbon Lewat Jatuh Tempo</span>
+						<div class="w-9 h-9 rounded-xl bg-[#F5F5F7] flex items-center justify-center text-[#1D1D1F]">
+							<svg class="w-5 h-5 text-[#8E8E93]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"></path></svg>
+						</div>
+					</div>
+					<div class="mt-4">
+						<div class="text-2xl font-bold text-[#1D1D1F] tracking-tight tabular-nums">
+							Rp { utils.FormatRupiah(utils.FloatToNumeric(data.Summary.TotalOverdue)) }
+						</div>
+						if data.Summary.TotalOverdue > 0 {
+							<span class="text-xs text-[#FF3B30] font-medium mt-1.5 block">Perlu segera dilakukan penagihan</span>
+						} else {
+							<span class="text-xs text-[#8E8E93] mt-1.5 block">Tidak ada kasbon lewat jatuh tempo</span>
+						}
+					</div>
+				</div>
+				<div class="bg-white rounded-2xl border border-[#E5E5EA] p-5 shadow-xs flex flex-col justify-between">
+					<div class="flex items-center justify-between">
+						<span class="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider">Cicilan Masuk Bulan Ini</span>
+						<div class="w-9 h-9 rounded-xl bg-[#F5F5F7] flex items-center justify-center text-[#1D1D1F]">
+							<svg class="w-5 h-5 text-[#8E8E93]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path></svg>
+						</div>
+					</div>
+					<div class="mt-4">
+						<div class="text-2xl font-bold text-[#1D1D1F] tracking-tight tabular-nums">
+							Rp { utils.FormatRupiah(utils.FloatToNumeric(data.Summary.TotalSettledThisMonth)) }
+						</div>
+						<span class="text-xs text-[#8E8E93] mt-1.5 block">Total dana pelunasan yang tertagih</span>
+					</div>
+				</div>
+			</div>
+			<div class="flex flex-col lg:flex-row gap-3 mb-4 items-stretch lg:items-center justify-between">
+				<div class="flex items-center gap-1.5 p-1 bg-[#F5F5F7] rounded-xl border border-[#E5E5EA] overflow-x-auto w-full sm:w-auto">
+					<a
+						href={ templ.SafeURL(fmt.Sprintf("/debts?tab=customers&q=%s&filter=%s", data.Query, data.Filter)) }
+						class={ "px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-2 whitespace-nowrap shrink-0",
+							templ.KV("bg-white text-[#1D1D1F] shadow-xs", data.ActiveTab == "customers"),
+							templ.KV("text-[#8E8E93] hover:text-[#1D1D1F]", data.ActiveTab != "customers") }
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.999-3.199a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"></path></svg>
+						<span>Rekap Saldo per Pelanggan</span>
+					</a>
+					<a
+						href={ templ.SafeURL(fmt.Sprintf("/debts?tab=invoices&q=%s&filter=%s", data.Query, data.Filter)) }
+						class={ "px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-2 whitespace-nowrap shrink-0",
+							templ.KV("bg-white text-[#1D1D1F] shadow-xs", data.ActiveTab == "invoices"),
+							templ.KV("text-[#8E8E93] hover:text-[#1D1D1F]", data.ActiveTab != "invoices") }
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"></path></svg>
+						<span>Daftar Semua Nota Kasbon</span>
+					</a>
+				</div>
+				<form method="GET" action="/debts" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
+					<input type="hidden" name="tab" value={ data.ActiveTab }/>
+					<div class="relative w-full sm:w-72">
+						<input
+							type="text"
+							name="q"
+							value={ data.Query }
+							placeholder="Cari nama, telepon, atau nota..."
+							class="w-full pl-10 pr-4 min-h-[44px] bg-white border border-[#E5E5EA] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF] text-[#1D1D1F] transition"
+						/>
+						<svg class="w-5 h-5 text-[#8E8E93] absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path></svg>
+					</div>
+					if data.ActiveTab == "customers" {
+						<select
+							name="filter"
+							onchange="this.form.submit()"
+							class="w-full sm:w-auto border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+						>
+							<option value="all" selected?={ data.Filter == "all" || data.Filter == "" }>Semua Pelanggan Berutang</option>
+							<option value="overdue" selected?={ data.Filter == "overdue" }>Prioritas: Lewat Jatuh Tempo</option>
+							<option value="debt_desc" selected?={ data.Filter == "debt_desc" }>Sisa Piutang Tertinggi</option>
+							<option value="debt_asc" selected?={ data.Filter == "debt_asc" }>Sisa Piutang Terendah</option>
+						</select>
+					} else {
+						<select
+							name="filter"
+							onchange="this.form.submit()"
+							class="w-full sm:w-auto border border-[#E5E5EA] rounded-xl px-3.5 min-h-[44px] bg-white text-[#1D1D1F] text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF] transition"
+						>
+							<option value="kasbon" selected?={ data.Filter == "kasbon" || data.Filter == "" }>Nota Belum Lunas</option>
+							<option value="overdue" selected?={ data.Filter == "overdue" }>Lewat Jatuh Tempo</option>
+							<option value="lunas" selected?={ data.Filter == "lunas" }>Nota Sudah Lunas</option>
+							<option value="all" selected?={ data.Filter == "all" }>Semua Status Nota</option>
+						</select>
+					}
+					<div class="flex items-center gap-2">
+						<button type="submit" class="flex-1 sm:flex-none px-5 min-h-[44px] rounded-xl bg-[#007AFF] hover:bg-[#0066D6] text-white text-sm font-semibold transition shadow-xs inline-flex items-center justify-center">
+							Cari
+						</button>
+						if data.Query != "" || data.Filter != "" {
+							<a
+								href={ templ.SafeURL("/debts?tab=" + data.ActiveTab) }
+								class="flex-1 sm:flex-none px-4 min-h-[44px] inline-flex items-center justify-center rounded-xl bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] text-sm font-medium border border-[#E5E5EA] transition"
+							>
+								Reset
+							</a>
+						}
+					</div>
+				</form>
+			</div>
+			if data.ActiveTab == "customers" {
+				<div class="bg-white rounded-2xl border border-[#E5E5EA] overflow-hidden shadow-xs mt-4">
+					<div class="overflow-x-auto">
+						<table class="w-full text-left border-collapse">
+							<thead class="bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]">
+								<tr>
+									<th class="px-6 py-3.5 font-medium">Pelanggan</th>
+									<th class="px-6 py-3.5 font-medium text-center">Jml Nota</th>
+									<th class="px-6 py-3.5 font-medium text-right">Total Kasbon</th>
+									<th class="px-6 py-3.5 font-medium text-right">Telah Dicicil</th>
+									<th class="px-6 py-3.5 font-medium text-right">Sisa Piutang</th>
+									<th class="px-6 py-3.5 font-medium">Jatuh Tempo</th>
+									<th class="px-6 py-3.5 font-medium text-right">Aksi</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+								for _, c := range data.CustomerRecap {
+									<tr class="hover:bg-[#F5F5F7]/50 transition">
+										<td class="px-6 py-3.5">
+											<div class="flex items-center gap-2">
+												<span class="font-bold text-[#1D1D1F]">{ c.CustomerName }</span>
+												if !c.IsActive {
+													<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-500 border border-gray-200">
+														Nonaktif
+													</span>
+												}
+											</div>
+											<div class="text-xs text-[#8E8E93] flex items-center gap-2 mt-0.5">
+												if c.CustomerPhone != "" {
+													<span class="font-mono">{ c.CustomerPhone }</span>
+												}
+												if c.CustomerAddress != "" {
+													<span class="truncate max-w-[200px]">• { c.CustomerAddress }</span>
+												}
+											</div>
+										</td>
+										<td class="px-6 py-3.5 text-center">
+											<span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5EA]">
+												{ fmt.Sprint(c.TotalInvoices) } Nota
+											</span>
+										</td>
+										<td class="px-6 py-3.5 text-right font-medium text-gray-700 tabular-nums">
+											Rp { utils.FormatRupiah(c.TotalDebtAmount) }
+										</td>
+										<td class="px-6 py-3.5 text-right font-medium text-gray-700 tabular-nums">
+											Rp { utils.FormatRupiah(c.TotalPaidAmount) }
+										</td>
+										<td class="px-6 py-3.5 text-right font-bold text-[#1D1D1F] tabular-nums">
+											Rp { utils.FormatRupiah(c.RemainingDebt) }
+										</td>
+										<td class="px-6 py-3.5 text-xs">
+											if c.EarliestDueDate.Valid {
+												if c.HasOverdue {
+													<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-[#FF3B30] border border-red-200">
+														Lewat JT: { c.EarliestDueDate.Time.Format("02/01/2006") }
+													</span>
+												} else {
+													<span class="text-gray-600 text-sm">
+														{ c.EarliestDueDate.Time.Format("02/01/2006") }
+													</span>
+												}
+											} else {
+												<span class="text-[#8E8E93] italic">Tidak ditentukan</span>
+											}
+										</td>
+										<td class="px-6 py-3.5 text-right">
+											<div class="flex items-center justify-end gap-1.5">
+												<button
+													type="button"
+													@click={ fmt.Sprintf("openCustomerDetail(%d)", c.CustomerID) }
+													class="inline-flex items-center justify-center min-h-[36px] px-3 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] hover:bg-[#F5F5F7] text-xs font-semibold transition"
+													title="Lihat rincian nota & riwayat cicilan"
+												>
+													Rincian
+												</button>
+												<button
+													type="button"
+													@click={ fmt.Sprintf("openPayCustomer(%d, %q, %f)", c.CustomerID, c.CustomerName, utils.NumericToFloat(c.RemainingDebt)) }
+													class="inline-flex items-center justify-center min-h-[36px] px-3.5 rounded-xl bg-[#007AFF] hover:bg-[#0066D6] text-white text-xs font-semibold transition shadow-xs"
+													title="Catat pembayaran / cicilan kasbon"
+												>
+													+ Bayar
+												</button>
+												<button
+													type="button"
+													@click={ fmt.Sprintf("openWaReminder(%d, %q, %q)", c.CustomerID, c.CustomerName, c.CustomerPhone) }
+													class="inline-flex items-center justify-center min-h-[36px] min-w-[36px] px-2.5 rounded-xl bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA] border border-[#E5E5EA] transition"
+													title="Kirim pengingat tagihan via WhatsApp"
+												>
+													<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"></path></svg>
+												</button>
+											</div>
+										</td>
+									</tr>
+								}
+								if len(data.CustomerRecap) == 0 {
+									<tr>
+										<td colspan="7" class="px-6 py-8 text-center text-[#8E8E93]">
+											Tidak ada pelanggan yang memiliki saldo kasbon saat ini.
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			} else {
+				<div class="bg-white rounded-2xl border border-[#E5E5EA] overflow-hidden shadow-xs mt-4">
+					<div class="overflow-x-auto">
+						<table class="w-full text-left border-collapse">
+							<thead class="bg-[#F5F5F7]/70 text-[#8E8E93] text-sm border-b border-[#E5E5EA]">
+								<tr>
+									<th class="px-6 py-3.5 font-medium">No. Invoice</th>
+									<th class="px-6 py-3.5 font-medium">Pelanggan</th>
+									<th class="px-6 py-3.5 font-medium">Tgl Transaksi</th>
+									<th class="px-6 py-3.5 font-medium">Jatuh Tempo</th>
+									<th class="px-6 py-3.5 font-medium text-right">Total Nota</th>
+									<th class="px-6 py-3.5 font-medium text-right">Sudah Dibayar</th>
+									<th class="px-6 py-3.5 font-medium text-right">Sisa Tagihan</th>
+									<th class="px-6 py-3.5 font-medium text-center">Status</th>
+									<th class="px-6 py-3.5 font-medium text-right">Aksi</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-[#E5E5EA] text-[15px]">
+								for _, inv := range data.Invoices {
+									<tr class="hover:bg-[#F5F5F7]/50 transition">
+										<td class="px-6 py-3.5 font-mono font-bold text-[#007AFF]">
+											<a href={ templ.SafeURL(fmt.Sprintf("/sales/%d", inv.SaleID)) } class="hover:underline">
+												{ inv.InvoiceNo }
+											</a>
+										</td>
+										<td class="px-6 py-3.5">
+											<div class="flex items-center gap-2">
+												<span class="font-bold text-[#1D1D1F]">{ inv.CustomerName }</span>
+												if !inv.IsCustomerActive {
+													<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-500 border border-gray-200">
+														Nonaktif
+													</span>
+												}
+											</div>
+											if inv.CustomerPhone != "" {
+												<div class="text-xs text-[#8E8E93] font-mono mt-0.5">{ inv.CustomerPhone }</div>
+											}
+										</td>
+										<td class="px-6 py-3.5 text-gray-600 text-sm">
+											{ inv.Date.Time.Local().Format("02/01/2006 15:04") }
+										</td>
+										<td class="px-6 py-3.5 text-xs">
+											if inv.DueDate.Valid {
+												if inv.IsOverdue.Bool {
+													<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-[#FF3B30] border border-red-200">
+														Lewat JT: { inv.DueDate.Time.Format("02/01/2006") }
+													</span>
+												} else {
+													<span class="text-gray-600 text-sm">
+														{ inv.DueDate.Time.Format("02/01/2006") }
+													</span>
+												}
+											} else {
+												<span class="text-[#8E8E93] italic">-</span>
+											}
+										</td>
+										<td class="px-6 py-3.5 text-right font-medium text-gray-700 tabular-nums">
+											Rp { utils.FormatRupiah(inv.TotalAmount) }
+										</td>
+										<td class="px-6 py-3.5 text-right font-medium text-gray-700 tabular-nums">
+											Rp { utils.FormatRupiah(inv.PaidAmount) }
+										</td>
+										<td class="px-6 py-3.5 text-right font-bold text-[#1D1D1F] tabular-nums">
+											Rp { utils.FormatRupiah(inv.RemainingAmount) }
+										</td>
+										<td class="px-6 py-3.5 text-center">
+											if inv.PaymentStatus == "lunas" {
+												<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-[#34C759] border border-green-200">
+													Lunas
+												</span>
+											} else {
+												<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-[#FF9500] border border-amber-200">
+													Belum Lunas
+												</span>
+											}
+										</td>
+										<td class="px-6 py-3.5 text-right">
+											<div class="flex items-center justify-end gap-2">
+												if inv.PaymentStatus == "kasbon" {
+													<button
+														type="button"
+														@click={ fmt.Sprintf("openPaySale(%d, %q, %f)", inv.SaleID, inv.InvoiceNo, utils.NumericToFloat(inv.RemainingAmount)) }
+														class="inline-flex items-center justify-center min-h-[36px] px-3.5 rounded-xl bg-[#007AFF] hover:bg-[#0066D6] text-white text-xs font-semibold transition shadow-xs"
+													>
+														+ Bayar
+													</button>
+												}
+												<a
+													href={ templ.SafeURL(fmt.Sprintf("/sales/%d", inv.SaleID)) }
+													class="inline-flex items-center justify-center min-w-[36px] min-h-[36px] bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA] rounded-xl transition text-xs font-medium px-3"
+												>
+													Detail
+												</a>
+											</div>
+										</td>
+									</tr>
+								}
+								if len(data.Invoices) == 0 {
+									<tr>
+										<td colspan="9" class="px-6 py-8 text-center text-[#8E8E93]">
+											Tidak ada data nota kasbon yang sesuai filter.
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					if data.TotalPages > 1 {
+						<div class="px-6 py-4 border-t border-[#E5E5EA] flex items-center justify-between text-xs text-[#8E8E93]">
+							<span>Halaman { fmt.Sprint(data.Page) } dari { fmt.Sprint(data.TotalPages) } ({ fmt.Sprint(data.TotalInvoices) } total nota)</span>
+							<div class="flex items-center gap-1.5">
+								if data.Page > 1 {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/debts?tab=invoices&q=%s&filter=%s&page=%d", data.Query, data.Filter, data.Page-1)) }
+										class="min-h-[36px] px-3.5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] hover:bg-[#F5F5F7] font-semibold transition inline-flex items-center"
+									>
+										&larr; Prev
+									</a>
+								}
+								if data.Page < data.TotalPages {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/debts?tab=invoices&q=%s&filter=%s&page=%d", data.Query, data.Filter, data.Page+1)) }
+										class="min-h-[36px] px-3.5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] hover:bg-[#F5F5F7] font-semibold transition inline-flex items-center"
+									>
+										Next &rarr;
+									</a>
+								}
+							</div>
+						</div>
+					}
+				</div>
+			}
+			<div
+				x-show="showPayModal"
+				x-transition.opacity
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/40 backdrop-blur-xs"
+				@click.self="showPayModal = false"
+			>
+				<div class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-md overflow-hidden p-6 space-y-4 my-auto sm:my-8">
+					<div class="flex items-center justify-between pb-3 border-b border-[#E5E5EA]">
+						<div class="flex items-center gap-2.5">
+							<div class="w-8 h-8 rounded-xl bg-[#F5F5F7] flex items-center justify-center text-[#1D1D1F]">
+								<svg class="w-4.5 h-4.5 text-[#8E8E93]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z"></path></svg>
+							</div>
+							<h3 class="font-bold text-[#1D1D1F] text-base">Catat Pembayaran Kasbon</h3>
+						</div>
+						<button type="button" @click="showPayModal = false" class="min-w-[36px] min-h-[36px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 rounded-xl transition">
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<form
+						@submit.prevent="submitPayment()"
+						class="space-y-4 text-xs"
+					>
+						<template x-if="payError">
+							<div class="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-[#FF3B30] flex items-center gap-2">
+								<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+								<span x-text="payError"></span>
+							</div>
+						</template>
+						<div class="bg-[#F5F5F7] p-3.5 rounded-xl border border-[#E5E5EA] space-y-1">
+							<span class="text-[#8E8E93] block">Target Pembayaran:</span>
+							<p class="font-bold text-sm text-[#1D1D1F]" x-text="payTargetName"></p>
+							<div class="flex justify-between items-center pt-1 text-xs">
+								<span class="text-[#8E8E93]">Sisa Piutang Saat Ini:</span>
+								<span class="font-bold text-[#1D1D1F] tabular-nums" x-text="'Rp ' + Number(payRemaining).toLocaleString('id-ID')"></span>
+							</div>
+						</div>
+						<div>
+							<label class="block font-semibold text-[#1D1D1F] mb-1.5 text-xs">Nominal Pembayaran (Rp) <span class="text-[#FF3B30]">*</span></label>
+							<input
+								type="number"
+								name="amount"
+								x-model="payAmount"
+								min="1"
+								:max="payRemaining"
+								placeholder="Masukkan jumlah yang dibayarkan..."
+								class="w-full px-4 min-h-[44px] bg-[#F5F5F7] border border-transparent rounded-xl text-base font-bold text-[#1D1D1F] outline-none focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition tabular-nums"
+								required
+							/>
+							<div class="flex gap-2 mt-2">
+								<button
+									type="button"
+									@click="payAmount = payRemaining"
+									class="px-2.5 py-1.5 rounded-lg bg-[#007AFF]/10 text-[#007AFF] font-semibold text-xs hover:bg-[#007AFF]/20 transition"
+								>
+									Bayar Lunas (Semua)
+								</button>
+								<button
+									type="button"
+									@click="payAmount = Math.min(50000, payRemaining)"
+									class="px-2.5 py-1.5 rounded-lg bg-[#F5F5F7] text-[#1D1D1F] font-semibold text-xs hover:bg-[#E5E5EA] transition border border-[#E5E5EA]"
+								>
+									50.000
+								</button>
+								<button
+									type="button"
+									@click="payAmount = Math.min(100000, payRemaining)"
+									class="px-2.5 py-1.5 rounded-lg bg-[#F5F5F7] text-[#1D1D1F] font-semibold text-xs hover:bg-[#E5E5EA] transition border border-[#E5E5EA]"
+								>
+									100.000
+								</button>
+							</div>
+						</div>
+						<div>
+							<label class="block font-semibold text-[#1D1D1F] mb-1.5 text-xs">Catatan / Keterangan Pembayaran</label>
+							<input
+								type="text"
+								name="notes"
+								x-model="payNotes"
+								placeholder="Misal: Cicilan tunai di toko / transfer bank"
+								class="w-full px-4 min-h-[44px] bg-[#F5F5F7] border border-transparent rounded-xl text-xs text-[#1D1D1F] outline-none focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition"
+							/>
+						</div>
+						<div class="pt-2 flex gap-2">
+							<button
+								type="button"
+								@click="showPayModal = false"
+								:disabled="paySubmitting"
+								class="flex-1 min-h-[44px] rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-semibold text-xs hover:bg-[#F5F5F7] disabled:opacity-50 transition"
+							>
+								Batal
+							</button>
+							<button
+								type="submit"
+								:disabled="paySubmitting"
+								class="flex-1 min-h-[44px] rounded-xl bg-[#007AFF] hover:bg-[#0066D6] disabled:opacity-50 text-white font-semibold text-xs transition shadow-xs flex items-center justify-center gap-1.5"
+							>
+								<template x-if="paySubmitting">
+									<svg class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+								</template>
+								<span x-text="paySubmitting ? 'Menyimpan...' : 'Simpan Pembayaran'"></span>
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+			<div
+				x-show="showDetailModal"
+				x-transition.opacity
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/40 backdrop-blur-xs"
+				@click.self="showDetailModal = false"
+			>
+				<div class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-2xl overflow-hidden p-6 space-y-4 max-h-[90vh] flex flex-col my-auto sm:my-8">
+					<div class="flex items-center justify-between pb-3 border-b border-[#E5E5EA] flex-shrink-0">
+						<div>
+							<div class="flex items-center gap-2">
+								<h3 class="font-bold text-[#1D1D1F] text-base" x-text="detailData ? detailData.Customer.name : 'Memuat Rincian...'"></h3>
+								<template x-if="detailData && isCustomerInactive(detailData.Customer)">
+									<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-500 border border-gray-200">
+										Nonaktif
+									</span>
+								</template>
+							</div>
+							<p class="text-xs text-[#8E8E93] mt-0.5" x-text="detailData && detailData.Customer.phone ? detailData.Customer.phone.String : ''"></p>
+						</div>
+						<button type="button" @click="showDetailModal = false" class="min-w-[36px] min-h-[36px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 rounded-xl transition">
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<div class="overflow-y-auto flex-1 space-y-4 pr-1 text-xs">
+						<template x-if="detailLoading">
+							<div class="py-12 text-center text-[#8E8E93]">
+								<svg class="w-6 h-6 animate-spin mx-auto text-[#007AFF] mb-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+								<span>Memuat data buku kasbon...</span>
+							</div>
+						</template>
+						<template x-if="detailData">
+							<div class="space-y-4">
+								<template x-if="isCustomerInactive(detailData.Customer)">
+									<div class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+										<div class="flex items-center gap-2 text-amber-800 text-xs">
+											<svg class="w-4 h-4 flex-shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"></path></svg>
+											<span>Pelanggan ini saat ini berstatus <strong>Nonaktif</strong> di master data.</span>
+										</div>
+										<button
+											type="button"
+											@click="restoreCustomer(detailData.Customer.id)"
+											class="px-3 min-h-[36px] bg-[#007AFF] hover:bg-[#0066D6] text-white rounded-lg font-semibold text-xs transition inline-flex items-center justify-center gap-1.5 shadow-xs flex-shrink-0"
+										>
+											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"></path></svg>
+											<span>Aktifkan Kembali Pelanggan</span>
+										</button>
+									</div>
+								</template>
+								<div class="grid grid-cols-3 gap-3 p-3.5 bg-[#F5F5F7] rounded-xl border border-[#E5E5EA] text-center">
+									<div>
+										<span class="text-[#8E8E93] block text-[11px]">Total Kasbon:</span>
+										<span class="font-bold text-[#1D1D1F] text-sm tabular-nums" x-text="'Rp ' + Number(detailData.TotalDebt).toLocaleString('id-ID')"></span>
+									</div>
+									<div>
+										<span class="text-[#8E8E93] block text-[11px]">Total Dicicil:</span>
+										<span class="font-bold text-[#1D1D1F] text-sm tabular-nums" x-text="'Rp ' + Number(detailData.TotalPaid).toLocaleString('id-ID')"></span>
+									</div>
+									<div>
+										<span class="text-[#8E8E93] block text-[11px]">Sisa Piutang:</span>
+										<span class="font-bold text-[#1D1D1F] text-sm tabular-nums" x-text="'Rp ' + Number(detailData.RemainingDebt).toLocaleString('id-ID')"></span>
+									</div>
+								</div>
+								<div>
+									<h4 class="font-bold text-[#1D1D1F] mb-2 flex items-center justify-between text-xs">
+										<span>Daftar Nota Belum Lunas</span>
+										<span class="text-[11px] font-normal text-[#8E8E93]" x-text="detailData.UnpaidInvoices.length + ' Nota'"></span>
+									</h4>
+									<div class="border border-[#E5E5EA] rounded-xl overflow-x-auto">
+										<table class="w-full text-left border-collapse">
+											<thead class="bg-[#F5F5F7]/70 border-b border-[#E5E5EA] text-[#8E8E93] font-medium text-xs">
+												<tr>
+													<th class="px-4 py-2.5">Invoice</th>
+													<th class="px-4 py-2.5">Tanggal</th>
+													<th class="px-4 py-2.5 text-right">Total</th>
+													<th class="px-4 py-2.5 text-right">Sisa Tagihan</th>
+													<th class="px-4 py-2.5 text-right">Aksi</th>
+												</tr>
+											</thead>
+											<tbody class="divide-y divide-[#E5E5EA] text-xs">
+												<template x-for="inv in detailData.UnpaidInvoices" :key="inv.sale_id">
+													<tr class="hover:bg-[#F5F5F7]/40 transition">
+														<td class="px-4 py-2.5 font-mono font-bold text-[#007AFF]" x-text="inv.invoice_no"></td>
+														<td class="px-4 py-2.5 text-[#8E8E93]" x-text="new Date(inv.date).toLocaleDateString('id-ID')"></td>
+														<td class="px-4 py-2.5 text-right font-medium tabular-nums" x-text="'Rp ' + Number(inv.total_amount).toLocaleString('id-ID')"></td>
+														<td class="px-4 py-2.5 text-right font-bold text-[#1D1D1F] tabular-nums" x-text="'Rp ' + Number(inv.remaining_amount).toLocaleString('id-ID')"></td>
+														<td class="px-4 py-2.5 text-right">
+															<button
+																type="button"
+																@click="showDetailModal = false; openPaySale(inv.sale_id, inv.invoice_no, Number(inv.remaining_amount))"
+																class="inline-flex items-center justify-center min-h-[30px] px-2.5 rounded-lg bg-[#007AFF] hover:bg-[#0066D6] text-white font-semibold text-[11px] transition shadow-xs"
+															>
+																+ Bayar
+															</button>
+														</td>
+													</tr>
+												</template>
+											</tbody>
+										</table>
+									</div>
+								</div>
+								<div>
+									<h4 class="font-bold text-[#1D1D1F] mb-2 flex items-center justify-between text-xs">
+										<span>Riwayat Cicilan Pembayaran</span>
+										<span class="text-[11px] font-normal text-[#8E8E93]" x-text="detailData.PaymentHistory.length + ' Kali Bayar'"></span>
+									</h4>
+									<div class="border border-[#E5E5EA] rounded-xl overflow-x-auto">
+										<table class="w-full text-left border-collapse">
+											<thead class="bg-[#F5F5F7]/70 border-b border-[#E5E5EA] text-[#8E8E93] font-medium text-xs">
+												<tr>
+													<th class="px-4 py-2.5">Waktu Bayar</th>
+													<th class="px-4 py-2.5">Untuk Nota</th>
+													<th class="px-4 py-2.5">Keterangan</th>
+													<th class="px-4 py-2.5 text-right">Nominal Bayar</th>
+												</tr>
+											</thead>
+											<tbody class="divide-y divide-[#E5E5EA] text-xs">
+												<template x-for="h in detailData.PaymentHistory" :key="h.id">
+													<tr class="hover:bg-[#F5F5F7]/40 transition">
+														<td class="px-4 py-2.5 text-[#8E8E93]" x-text="new Date(h.date).toLocaleString('id-ID')"></td>
+														<td class="px-4 py-2.5 font-mono text-[#007AFF] font-bold" x-text="h.invoice_no"></td>
+														<td class="px-4 py-2.5 text-[#8E8E93]" x-text="h.notes || '-'"></td>
+														<td class="px-4 py-2.5 text-right font-bold text-[#1D1D1F] tabular-nums" x-text="'Rp ' + Number(h.amount_paid).toLocaleString('id-ID')"></td>
+													</tr>
+												</template>
+												<template x-if="detailData.PaymentHistory.length === 0">
+													<tr>
+														<td colspan="4" class="px-4 py-6 text-center text-[#8E8E93]">Belum ada riwayat cicilan masuk.</td>
+													</tr>
+												</template>
+											</tbody>
+										</table>
+									</div>
+								</div>
+							</div>
+						</template>
+					</div>
+					<div class="pt-3 border-t border-[#E5E5EA] flex justify-end gap-2 flex-shrink-0">
+						<button
+							type="button"
+							@click="showDetailModal = false"
+							class="min-h-[40px] px-5 rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-semibold text-xs hover:bg-[#F5F5F7] transition"
+						>
+							Tutup
+						</button>
+					</div>
+				</div>
+			</div>
+			<div
+				x-show="showWaModal"
+				x-transition.opacity
+				x-cloak
+				class="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 bg-black/40 backdrop-blur-xs"
+				@click.self="showWaModal = false"
+			>
+				<div class="bg-white rounded-2xl shadow-2xl border border-[#E5E5EA] w-full max-w-lg overflow-hidden p-6 space-y-4 my-auto sm:my-8">
+					<div class="flex items-center justify-between pb-3 border-b border-[#E5E5EA]">
+						<div class="flex items-center gap-2.5">
+							<div class="w-8 h-8 rounded-xl bg-[#25D366]/10 flex items-center justify-center text-[#25D366]">
+								<svg class="w-4.5 h-4.5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"></path></svg>
+							</div>
+							<div>
+								<h3 class="font-bold text-[#1D1D1F] text-base">Kirim Tagihan via WhatsApp</h3>
+								<div class="mt-0.5">
+									<template x-if="waConnected">
+										<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#34C759]/10 text-[#34C759]">
+											<span class="w-1.5 h-1.5 rounded-full bg-[#34C759]"></span>
+											Whatsapp Terhubung
+										</span>
+									</template>
+									<template x-if="!waConnected">
+										<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#FF9500]/10 text-[#FF9500]">
+											<span class="w-1.5 h-1.5 rounded-full bg-[#FF9500]"></span>
+											WhatsApp Belum Terhubung
+										</span>
+									</template>
+								</div>
+							</div>
+						</div>
+						<button type="button" @click="showWaModal = false" class="min-w-[36px] min-h-[36px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#1D1D1F] hover:bg-black/5 rounded-xl transition">
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path></svg>
+						</button>
+					</div>
+					<div class="space-y-3.5 text-xs">
+						<div>
+							<label class="block font-semibold text-[#1D1D1F] mb-1.5 text-xs">Nomor WhatsApp Pelanggan</label>
+							<div class="flex gap-2">
+								<input
+									type="text"
+									x-model="waPhone"
+									placeholder="081234567890"
+									class="flex-1 px-4 min-h-[44px] bg-[#F5F5F7] border border-transparent rounded-xl text-sm font-mono text-[#1D1D1F] outline-none focus:bg-white focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 transition"
+								/>
+								<button
+									type="button"
+									@click="loadWaDraft()"
+									:disabled="waLoadingDraft"
+									class="px-4 min-h-[44px] bg-[#E5E5EA] hover:bg-[#D1D1D6] disabled:opacity-50 font-semibold text-[#1D1D1F] text-xs rounded-xl transition flex items-center gap-1.5"
+								>
+									<template x-if="waLoadingDraft">
+										<svg class="w-3.5 h-3.5 animate-spin text-[#1D1D1F]" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+									</template>
+									<span>Perbarui Draf</span>
+								</button>
+							</div>
+						</div>
+						<div>
+							<label class="block font-semibold text-[#1D1D1F] mb-1.5 text-xs">Pratinjau Pesan Tagihan</label>
+							<div class="relative">
+								<textarea
+									x-model="waPreview"
+									rows="8"
+									class="w-full p-3.5 bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl font-mono text-xs text-[#1D1D1F] outline-none focus:bg-white focus:border-[#007AFF] transition resize-none leading-relaxed"
+								></textarea>
+								<template x-if="waLoadingDraft">
+									<div class="absolute inset-0 bg-white/70 backdrop-blur-xs flex items-center justify-center rounded-xl">
+										<span class="text-xs text-[#007AFF] font-medium animate-pulse">Menyiapkan draf tagihan...</span>
+									</div>
+								</template>
+							</div>
+						</div>
+						<template x-if="waError">
+							<div class="text-xs text-[#FF3B30] bg-red-50 border border-red-200 p-3 rounded-xl font-medium flex items-center gap-2">
+								<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+								<span x-text="waError"></span>
+							</div>
+						</template>
+						<template x-if="waSuccess">
+							<div class="text-xs text-[#34C759] bg-green-50 border border-green-200 p-3 rounded-xl font-medium flex items-center gap-2">
+								<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+								<span x-text="waSuccess"></span>
+							</div>
+						</template>
+						<div class="pt-2 flex flex-col sm:flex-row gap-2">
+							<button
+								type="button"
+								@click="showWaModal = false"
+								class="px-4 min-h-[44px] rounded-xl border border-[#E5E5EA] text-[#1D1D1F] font-semibold text-xs hover:bg-[#F5F5F7] transition"
+							>
+								Tutup
+							</button>
+							<button
+								type="button"
+								@click="sendWaViaWhatsmeow()"
+								:disabled="waSending || waLoadingDraft"
+								class="flex-1 min-h-[44px] rounded-xl bg-[#25D366] hover:bg-[#20BA5A] disabled:opacity-50 text-white font-semibold text-xs flex items-center justify-center gap-2 transition shadow-xs text-center"
+							>
+								<template x-if="waSending">
+									<svg class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+								</template>
+								<template x-if="!waSending">
+									<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"></path></svg>
+								</template>
+								<span x-text="waSending ? 'Mengirim via Whatsmeow...' : 'Kirim via Whatsmeow'"></span>
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}

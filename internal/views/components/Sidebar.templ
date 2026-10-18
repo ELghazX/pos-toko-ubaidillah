@@ -1,0 +1,273 @@
+package components
+
+templ Sidebar(activeMenu string) {
+	@SidebarWithMode(activeMenu, false)
+}
+
+templ DrawerSidebar(activeMenu string) {
+	@SidebarWithMode(activeMenu, true)
+}
+
+templ SidebarWithMode(activeMenu string, isDrawer bool) {
+	if isDrawer {
+		<div x-show="sidebarOpen" x-transition.opacity class="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs" @click="sidebarOpen = false" x-cloak></div>
+		<aside
+			class="w-64 fixed inset-y-0 left-0 flex flex-col bg-white/95 backdrop-blur-xl border-r border-[#E5E5EA] transition-all duration-200 transform z-50 shadow-2xl -translate-x-full"
+			:class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+		>
+			@sidebarNav(activeMenu, true)
+		</aside>
+	} else {
+		<div x-show="sidebarOpen" x-transition.opacity class="fixed inset-0 z-20 bg-black/40 backdrop-blur-xs lg:hidden" @click="sidebarOpen = false" x-cloak></div>
+		<aside
+			class="fixed inset-y-0 left-0 flex flex-col bg-white/95 backdrop-blur-xl border-r border-[#E5E5EA] transition-all duration-200 transform z-30 lg:static lg:translate-x-0 -translate-x-full"
+			:class="{
+				'w-20': sidebarFolded,
+				'w-64': !sidebarFolded,
+				'translate-x-0': sidebarOpen,
+				'-translate-x-full': !sidebarOpen
+			}"
+		>
+			@sidebarNav(activeMenu, false)
+		</aside>
+	}
+}
+
+templ sidebarNav(activeMenu string, isDrawer bool) {
+	<div class="flex items-center justify-between h-16 px-4 border-b border-[#E5E5EA]">
+		if IsAdminContext(ctx) {
+			<a href="/dashboard" class="flex items-center gap-3 overflow-hidden">
+				<span x-show="!sidebarFolded" class="text-xl font-bold whitespace-nowrap text-[#1D1D1F] tracking-tight">ELghazPOS</span>
+			</a>
+		} else {
+			<a href="/pos" class="flex items-center gap-3 overflow-hidden">
+				<span x-show="!sidebarFolded" class="text-xl font-bold whitespace-nowrap text-[#1D1D1F] tracking-tight">ELghazPOS</span>
+			</a>
+		}
+		<button @click="sidebarOpen = false" class={ "min-w-[44px] min-h-[44px] inline-flex items-center justify-center text-[#8E8E93] hover:text-[#1D1D1F] rounded-xl hover:bg-black/5 transition", templ.KV("lg:hidden", !isDrawer) } title="Tutup Menu">
+			<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+		</button>
+	</div>
+	<nav class="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
+		if IsAdminContext(ctx) {
+			<div>
+				<div class="space-y-1">
+					<a
+						href="/dashboard"
+						class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+							   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "dashboard"), 
+							   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "dashboard") }
+					>
+						<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+						<span x-show="!sidebarFolded" class="truncate">Dashboard</span>
+						<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Dashboard</div>
+					</a>
+				</div>
+			</div>
+		}
+		<div>
+			<div x-show="!sidebarFolded" class="px-3 mb-2 text-xs font-semibold tracking-wider text-[#8E8E93] uppercase">
+				Kasir & Penjualan
+			</div>
+			<div x-show="sidebarFolded" x-cloak class="mb-2 border-t border-[#E5E5EA]"></div>
+			<div class="space-y-1">
+				<a
+					href="/pos"
+					@click="if (window.location.pathname === '/pos') { $event.preventDefault(); sidebarOpen = false; }"
+					class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+						   templ.KV("bg-[#007AFF] text-white font-semibold shadow-xs", activeMenu == "pos"), 
+						   templ.KV("text-gray-600 hover:bg-black/5 font-medium", activeMenu != "pos") }
+				>
+					<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+					<span x-show="!sidebarFolded" class="truncate">Layar Kasir (POS)</span>
+					<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Layar Kasir (POS)</div>
+				</a>
+				<a
+					href="/sales"
+					class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+						   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "sales"), 
+						   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "sales") }
+				>
+					<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+					<span x-show="!sidebarFolded" class="truncate">Riwayat Penjualan</span>
+					<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Riwayat Penjualan</div>
+				</a>
+				<a
+					href="/debts"
+					class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+						   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "debts"), 
+						   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "debts") }
+				>
+					<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+					<span x-show="!sidebarFolded" class="truncate">Buku Rekap Kasbon</span>
+					<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Buku Rekap Kasbon</div>
+				</a>
+				<a
+					href="/customers"
+					class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+						   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "customers"), 
+						   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "customers") }
+				>
+					<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+					<span x-show="!sidebarFolded" class="truncate">Data Pelanggan</span>
+					<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Data Pelanggan</div>
+				</a>
+			</div>
+		</div>
+		if IsAdminContext(ctx) {
+			<div>
+				<div x-show="!sidebarFolded" class="px-3 mb-2 text-xs font-semibold tracking-wider text-[#8E8E93] uppercase">
+					Persediaan
+				</div>
+				<div x-show="sidebarFolded" x-cloak class="mb-2 border-t border-[#E5E5EA]"></div>
+				<div class="space-y-1">
+					<a
+						href="/categories"
+						class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+							   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "categories"), 
+							   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "categories") }
+					>
+						<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+						<span x-show="!sidebarFolded" class="truncate">Kategori</span>
+						<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Kategori</div>
+					</a>
+					<a
+						href="/products"
+						class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+							   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "products"), 
+							   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "products") }
+					>
+						<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+						<span x-show="!sidebarFolded" class="truncate">Master Produk</span>
+						<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Master Produk</div>
+					</a>
+					<a
+						href="/stock-adjustments"
+						class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+							   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "stock-adjustments"), 
+							   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "stock-adjustments") }
+					>
+						<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+						<span x-show="!sidebarFolded" class="truncate">Stok Opname &amp; Pakai</span>
+						<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Stok Opname &amp; Pakai</div>
+					</a>
+					<a
+						href="/products/print-labels"
+						class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+							   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "print-labels"), 
+							   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "print-labels") }
+					>
+						<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+						<span x-show="!sidebarFolded" class="truncate">Cetak Label Rak</span>
+						<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Cetak Label Rak</div>
+					</a>
+				</div>
+			</div>
+			<div>
+				<div x-show="!sidebarFolded" class="px-3 mb-2 text-xs font-semibold tracking-wider text-[#8E8E93] uppercase">
+					Pembelian
+				</div>
+				<div x-show="sidebarFolded" x-cloak class="mb-2 border-t border-[#E5E5EA]"></div>
+				<div class="space-y-1">
+					<a
+						href="/suppliers"
+						class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+							   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "suppliers"), 
+							   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "suppliers") }
+					>
+						<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+						<span x-show="!sidebarFolded" class="truncate">Data Supplier</span>
+						<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Data Supplier</div>
+					</a>
+					<a
+						href="/purchase-orders"
+						class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+							   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "purchase-orders"), 
+							   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "purchase-orders") }
+					>
+						<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+						<span x-show="!sidebarFolded" class="truncate">Purchase Order</span>
+						<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Purchase Order</div>
+					</a>
+					<a
+						href="/goods-receipts"
+						class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+							   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "goods-receipts"), 
+							   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "goods-receipts") }
+					>
+						<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+						<span x-show="!sidebarFolded" class="truncate">Terima Barang</span>
+						<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Terima Barang</div>
+					</a>
+				</div>
+			</div>
+			<div>
+				<div x-show="!sidebarFolded" class="px-3 mb-2 text-xs font-semibold tracking-wider text-[#8E8E93] uppercase">
+					Sistem
+				</div>
+				<div x-show="sidebarFolded" x-cloak class="mb-2 border-t border-[#E5E5EA]"></div>
+				<div class="space-y-1">
+					<a
+						href="/settings/company"
+						class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+							   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "settings"), 
+							   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "settings") }
+					>
+						<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+						<span x-show="!sidebarFolded" class="truncate">Profil Toko</span>
+						<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Profil Toko</div>
+					</a>
+					<a
+						href="/settings/users"
+						class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+							   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "users"), 
+							   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "users") }
+					>
+						<svg class="flex-shrink-0 w-5 h-5 mr-3" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+						<span x-show="!sidebarFolded" class="truncate">Manajemen Akun</span>
+						<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>Manajemen Akun</div>
+					</a>
+					<a
+						href="/settings/whatsapp"
+						class={ "flex items-center px-3 min-h-[44px] rounded-xl transition-colors group relative text-[15px]", 
+							   templ.KV("bg-[#007AFF]/15 text-[#007AFF] font-semibold", activeMenu == "whatsapp"), 
+							   templ.KV("text-gray-600 hover:bg-black/5", activeMenu != "whatsapp") }
+					>
+						<svg class="flex-shrink-0 w-5 h-5 mr-3 fill-current text-[#25D366]" :class="sidebarFolded ? 'mx-auto !mr-0' : 'mr-3'" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.173.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.176.582 4.217 1.597 5.975l-1.605 5.869 6.046-1.587c1.705.938 3.665 1.473 5.751 1.473 6.627 0 12-5.373 12-12 0-6.628-5.373-12-11.789-12z"></path></svg>
+						<span x-show="!sidebarFolded" class="truncate">WhatsApp</span>
+						<div x-show="sidebarFolded" class="absolute left-full ml-2 px-2.5 py-1 bg-[#1C1C1E] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50" x-cloak>WhatsApp</div>
+					</a>
+				</div>
+			</div>
+		}
+	</nav>
+	if user := UserFromContext(ctx); user != nil {
+		<div class="p-3 border-t border-[#E5E5EA] bg-[#F5F5F7]/60">
+			<div x-show="!sidebarFolded" class="flex items-center justify-between gap-2 px-2 py-1.5 mb-2">
+				<div class="min-w-0">
+					<div class="text-sm font-semibold text-[#1D1D1F] truncate">{ user.Name }</div>
+					<div class="flex items-center gap-1.5 mt-0.5">
+						<span class="text-xs text-[#8E8E93] truncate">{ "@" + user.Username }</span>
+						<span
+							class={ "inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider",
+								templ.KV("bg-[#007AFF]/15 text-[#007AFF]", user.IsAdmin()),
+								templ.KV("bg-[#34C759]/15 text-[#248A3D]", !user.IsAdmin()) }
+						>
+							{ user.RoleLabel() }
+						</span>
+					</div>
+				</div>
+			</div>
+			<form action="/logout" method="POST" hx-boost="false">
+				<button
+					type="submit"
+					class="w-full min-h-[40px] px-3 flex items-center justify-center gap-2 rounded-xl text-sm font-medium text-[#FF3B30] hover:bg-[#FF3B30]/10 transition-colors cursor-pointer"
+					title="Keluar Sesi"
+				>
+					<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+					<span x-show="!sidebarFolded">Keluar</span>
+				</button>
+			</form>
+		</div>
+	}
+}
